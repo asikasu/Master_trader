@@ -1,0 +1,7 @@
+data/
+logs/
+models/
+__pycache__/
+*.pyc
+*.parquet
+.env
