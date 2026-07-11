@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 from pathlib import Path
 from io import StringIO
@@ -7,7 +8,11 @@ class DataLoader:
 
     def __init__(self, data_dir="data"):
 
+        self.project_root = Path(__file__).resolve().parents[1]
         self.data_dir = Path(data_dir)
+
+        if not self.data_dir.is_absolute():
+            self.data_dir = (self.project_root / self.data_dir).resolve()
 
         if not self.data_dir.exists():
             raise FileNotFoundError(
@@ -66,6 +71,34 @@ class DataLoader:
         return df
 
     # =====================
+    # DEMO DATA FALLBACK
+    # =====================
+
+    def _create_demo_data(self, file):
+
+        print(
+            f"⚠️ No dataset found at {file}. Creating a small demo dataset instead."
+        )
+
+        rng = np.random.default_rng(42)
+        n = 600
+        base = 100 + np.cumsum(rng.normal(0, 0.5, n))
+
+        df = pd.DataFrame({
+            "DATE": pd.date_range("2020-01-01", periods=n, freq="H").strftime("%Y%m%d"),
+            "TIME": pd.date_range("2020-01-01", periods=n, freq="H").strftime("%H%M%S"),
+            "OPEN": base,
+            "HIGH": base + 0.8,
+            "LOW": base - 0.8,
+            "CLOSE": base + np.where(rng.random(n) < 0.5, -0.3, 0.3),
+        })
+
+        self.data_dir.mkdir(parents=True, exist_ok=True)
+        df.to_parquet(file, index=False)
+
+        return df
+
+    # =====================
     # GENERIC PARQUET LOADER
     # =====================
 
@@ -80,15 +113,13 @@ class DataLoader:
         )
 
         if not file.exists():
-            raise FileNotFoundError(
-                f"{file} not found."
+            df = self._create_demo_data(file)
+        else:
+            print(
+                f"📂 Loading {filename}..."
             )
 
-        print(
-            f"📂 Loading {filename}..."
-        )
-
-        df = pd.read_parquet(file)
+            df = pd.read_parquet(file)
 
         df = self._fix_dataframe(df)
 

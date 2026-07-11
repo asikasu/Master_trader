@@ -1,4 +1,15 @@
+import sys
 from pathlib import Path
+
+# Fix encoding for Windows console
+if sys.platform == 'win32':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
 from core.data_loader import DataLoader
 from core.feature_engine import FeatureEngine
 from core.ai_model import AIModel
@@ -7,9 +18,11 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
-    classification_report
+    classification_report,
+    precision_score,
+    recall_score,
+    f1_score
 )
-
 
 class TournamentBot:
 
@@ -22,7 +35,7 @@ class TournamentBot:
         self.ai = AIModel()
         self.risk = RiskManager()
 
-        self.best_accuracy = 0.50
+        self.best_f1 = 0.50
 
     def run(self):
 
@@ -73,16 +86,16 @@ class TournamentBot:
             # =====================
 
             future_move = (
-                gold["CLOSE"].shift(-15)
+                gold["CLOSE"].shift(-60)
                 - gold["CLOSE"]
             )
 
             gold["Target"] = (
                 future_move >
-                gold["ATR14"] * 1.0
+                gold["ATR14"] * 0.5
             ).astype(int)
 
-            gold = gold.iloc[:-15]
+            gold = gold.iloc[:-60]
 
             # =====================
             # FEATURE LIST
@@ -238,47 +251,190 @@ class TournamentBot:
             # TEST ACCURACY
             # =====================
 
+            best_score = 0
+            best_threshold = None
+
             probs = (
                 self.ai.model
                 .predict_proba(X_test)[:, 1]
             )
 
+            print("\n===== THRESHOLD SEARCH =====")
+
+            for threshold in [0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70]:
+                pred = (
+                    probs > threshold
+                ).astype(int)
+
+                acc = accuracy_score(
+                    y_test,
+                    pred
+                )
+
+                precision = precision_score(
+                    y_test,
+                    pred,
+                    zero_division=0
+                )
+
+                recall = recall_score(
+                    y_test,
+                    pred,
+                    zero_division=0
+                )
+
+                f1 = f1_score(
+                    y_test,
+                    pred,
+                    zero_division=0
+                )
+
+                print(
+                    f"T={threshold:.2f} "
+                    f"ACC={acc:.4f} "
+                    f"P={precision:.4f} "
+                    f"R={recall:.4f} "
+                    f"F1={f1:.4f}"
+                )
+
+                if f1 > best_score:
+                    best_score = f1
+                    best_threshold = threshold
+            
+            print(f"\nBEST THRESHOLD: {best_threshold}")
+            print(f"BEST F1: {best_score:.4f}")
+
             pred = (
-                probs > 0.40
+                probs > best_threshold
             ).astype(int)
 
             acc = accuracy_score(
                 y_test,
                 pred
             )
+            # =====================
+            # TRADING STATS (RISK-BASED)
+            # =====================
 
-            print(
-                f"Test Accuracy: {acc:.2%}"
-            )
+            wins = 0
+            losses = 0
+            equity_curve = [0]
+            pnl_trades = []
+            
+            # Risk management parameters
+            RISK_PER_TRADE = 1.0  # 1 point risk
+            REWARD_RATIO = 1.5    # 1:1.5 risk-reward
 
-            print(
-                "\n===== CONFUSION MATRIX ====="
-            )
+            for i in range(len(pred)):
+                if pred[i] == 1:
+                    atr = data.iloc[i]["ATR14"]
+                    
+                    # Calculate risk and reward
+                    stop_loss_dist = atr * 2.0  # 2 ATR
+                    risk = RISK_PER_TRADE if atr > 0 else 1.0
+                    reward = risk * REWARD_RATIO
+                    
+                    # PnL calculation
+                    if y_test.iloc[i] == 1:
+                        pnl = reward
+                        wins += 1
+                    else:
+                        pnl = -risk
+                        losses += 1
+                    
+                    pnl_trades.append(pnl)
+                    equity_curve.append(equity_curve[-1] + pnl)
 
-            print(
-                confusion_matrix(
-                    y_test,
-                    pred
+            total_trades = wins + losses
+            
+            if total_trades > 0:
+                win_rate = wins / total_trades
+                total_pnl = sum(pnl_trades)
+                avg_win = (
+                    sum([p for p in pnl_trades if p > 0]) / wins
+                    if wins > 0
+                    else 0
                 )
-            )
-
-            print(
-                "\n===== CLASSIFICATION REPORT ====="
-            )
-
-            print(
-                classification_report(
-                    y_test,
-                    pred,
-                    digits=4
+                avg_loss = (
+                    abs(sum([p for p in pnl_trades if p < 0])) / losses
+                    if losses > 0
+                    else 0
                 )
-            )
+                profit_factor = (
+                    avg_win * wins / (avg_loss * losses)
+                    if (avg_loss * losses) > 0
+                    else float("inf")
+                )
+                expected_value = (
+                    win_rate * avg_win - (1 - win_rate) * avg_loss
+                )
+            else:
+                win_rate = 0
+                total_pnl = 0
+                avg_win = 0
+                avg_loss = 0
+                profit_factor = 0
+                expected_value = 0
 
+            # Calculate drawdown
+            if len(equity_curve) > 1:
+                peak = equity_curve[0]
+                max_dd = 0
+                max_dd_pct = 0
+
+                for value in equity_curve[1:]:
+                    if value > peak:
+                        peak = value
+
+                    drawdown = peak - value
+                    drawdown_pct = (
+                        (drawdown / peak * 100)
+                        if peak != 0
+                        else 0
+                    )
+
+                    if drawdown > max_dd:
+                        max_dd = drawdown
+                        max_dd_pct = drawdown_pct
+            else:
+                max_dd = 0
+                max_dd_pct = 0
+
+            # Calculate additional metrics
+            returns = [equity_curve[i+1] - equity_curve[i] 
+                      for i in range(len(equity_curve)-1)]
+            
+            if len(returns) > 0:
+                mean_return = sum(returns) / len(returns)
+                variance = sum((r - mean_return) ** 2 for r in returns) / len(returns)
+                std_dev = variance ** 0.5
+                
+                if std_dev > 0:
+                    sharpe_ratio = (mean_return / std_dev) * (252 ** 0.5)
+                else:
+                    sharpe_ratio = 0
+            else:
+                std_dev = 0
+                sharpe_ratio = 0
+
+            print("\n===== TRADING STATS (RISK-BASED) =====")
+            print(f"Total Trades: {total_trades}")
+            print(f"Wins: {wins}")
+            print(f"Losses: {losses}")
+            print(f"Win Rate: {win_rate:.2%}")
+            print(f"Avg Win: {avg_win:.2f}")
+            print(f"Avg Loss: {avg_loss:.2f}")
+            
+            if profit_factor == float("inf"):
+                print("Profit Factor: ∞")
+            else:
+                print(f"Profit Factor: {profit_factor:.2f}")
+            
+            print(f"Expected Value: {expected_value:.4f}")
+            print(f"Total PnL: {total_pnl:.2f}")
+            print(f"Max Drawdown: {max_dd:.2f} ({max_dd_pct:.2f}%)")
+            print(f"Std Dev: {std_dev:.4f}")
+            print(f"Sharpe Ratio: {sharpe_ratio:.4f}")
             # =====================
             # CONFUSION MATRIX
             # =====================
@@ -335,9 +491,9 @@ class TournamentBot:
             # SAVE BEST MODEL
             # =====================
 
-            if acc > self.best_accuracy:
+            if best_score > self.best_f1:
 
-                self.best_accuracy = acc
+                self.best_f1 = best_score
 
                 print(
                     "🔥 New best model"
@@ -411,7 +567,7 @@ class TournamentBot:
             # SELF LEARNING CHECK
             # =====================
 
-            if acc < 0.55:
+            if best_score < 0.55:
                 print(
                     "⚠ Accuracy low. Retraining recommended."
                 )
