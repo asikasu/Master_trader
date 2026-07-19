@@ -8,9 +8,9 @@ class AIModel:
     def __init__(self):
         self.project_root = Path(__file__).resolve().parents[1]
         self.model = XGBClassifier(
-            n_estimators=1000,
-            max_depth=8,
-            learning_rate=0.02,
+            n_estimators=200,
+            max_depth=6,
+            learning_rate=0.05,
             subsample=0.8,
             colsample_bytree=0.8,
             min_child_weight=10,
@@ -21,8 +21,8 @@ class AIModel:
             n_jobs=-1
         )
 
-    def train(self, X, y):
-        self.model.fit(X, y)
+    def train(self, X, y, eval_set=None, verbose=True):
+        self.model.fit(X, y, eval_set=eval_set, verbose=verbose)
 
     def predict(self, X):
         return self.model.predict(X)
@@ -40,7 +40,7 @@ class AIModel:
             model_dir / "best_model.pkl"
         )
 
-        print("💾 Model saved")
+        print("[SAVE] Model saved")
 
     def load(self):
 
@@ -52,10 +52,8 @@ class AIModel:
                 model_file
             )
 
-            print("📂 Model loaded")
+            print("[LOAD] Model loaded")
 
         else:
 
-            print(
-                "⚠ No saved model found."
-            )
+            print("[WARNING] No saved model found.")

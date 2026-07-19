@@ -77,7 +77,7 @@ class DataLoader:
     def _create_demo_data(self, file):
 
         print(
-            f"⚠️ No dataset found at {file}. Creating a small demo dataset instead."
+            f"[WARNING] No dataset found at {file}. Creating demo dataset instead."
         )
 
         rng = np.random.default_rng(42)
@@ -85,8 +85,8 @@ class DataLoader:
         base = 100 + np.cumsum(rng.normal(0, 0.5, n))
 
         df = pd.DataFrame({
-            "DATE": pd.date_range("2020-01-01", periods=n, freq="H").strftime("%Y%m%d"),
-            "TIME": pd.date_range("2020-01-01", periods=n, freq="H").strftime("%H%M%S"),
+            "DATE": pd.date_range("2020-01-01", periods=n, freq="h").strftime("%Y%m%d"),
+            "TIME": pd.date_range("2020-01-01", periods=n, freq="h").strftime("%H%M%S"),
             "OPEN": base,
             "HIGH": base + 0.8,
             "LOW": base - 0.8,
@@ -115,17 +115,12 @@ class DataLoader:
         if not file.exists():
             df = self._create_demo_data(file)
         else:
-            print(
-                f"📂 Loading {filename}..."
-            )
-
+            print(f"Loading {filename}...")
             df = pd.read_parquet(file)
 
         df = self._fix_dataframe(df)
 
-        print(
-            f"✅ Loaded {len(df):,} rows"
-        )
+        print(f"Loaded {len(df):,} rows")
 
         return df
 

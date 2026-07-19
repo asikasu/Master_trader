@@ -5,3 +5,7 @@ __pycache__/
 *.pyc
 *.parquet
 .env
+*.txt
+*.lnk
+best_params.json
+evolution_state.json
