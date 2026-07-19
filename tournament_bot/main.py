@@ -123,13 +123,14 @@ class TournamentBot:
         reason = f" | {sig['reason']}" if sig['reason'] else ""
         print(f"SIGNAL: {sig['signal']} | Prob={prob:.2%} {sl_str} {tp_str}{reason}")
 
-    def run_evolve(self, generations=10, population=100):
+    def run_evolve(self, generations=10, population=100, sample_size=5000):
         print("=== EVOLVE MODE ===")
         engine = self.evo_trainer.run_evolution(
             generations=generations,
             population=population,
             resume=True,
             state_dir=str(Path(".").resolve()),
+            sample_size=sample_size,
         )
         state = engine.state
         if state and state.best_fitness:
@@ -296,6 +297,8 @@ if __name__ == "__main__":
     parser.add_argument("--generations", type=int, default=10)
     parser.add_argument("--population", type=int, default=100)
     parser.add_argument("--symbol", default="XAUUSD")
+    parser.add_argument("--sample", type=int, default=5000,
+                        help="Evolution: use first N rows for speed (0 = all)")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args()
 
@@ -307,7 +310,7 @@ if __name__ == "__main__":
         if args.mode in ("TRAIN", "BOTH"):
             bot.run_train()
         if args.mode in ("EVOLVE", "BOTH"):
-            bot.run_evolve(generations=args.generations, population=args.population)
+            bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample)
         if args.mode == "LIVE":
             bot.run_live(symbol=args.symbol)
     except Exception as e:

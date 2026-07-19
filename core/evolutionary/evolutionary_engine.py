@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 import pandas as pd
 import numpy as np
 from typing import Callable, Dict, List, Optional, Tuple
@@ -106,7 +107,7 @@ class EvolutionaryEngine:
             eval_metric="logloss",
             n_jobs=-1,
         )
-        model.fit(X_train, y_train)
+        model.fit(X_train, y_train, verbose=False)
 
         test_df = self.data.iloc[test_start:test_end].copy()
         X_test = test_df[self.feature_columns].values
@@ -156,11 +157,16 @@ class EvolutionaryEngine:
             logger.info("Train: [%d:%d], Test: [%d:%d]", ts, te, vs, ve)
 
             results: List[EvaluationResult] = []
-            for combo in self.state.population:
+            pop_size = len(self.state.population)
+            for idx, combo in enumerate(self.state.population):
                 try:
+                    t0 = time.time()
                     eq = self._backtest(combo, ts, te, vs, ve)
+                    elapsed = time.time() - t0
                     fitness = compute_fitness(eq)
                     results.append(EvaluationResult(combo=combo, fitness=fitness, equity_curve=eq))
+                    if (idx + 1) % max(1, pop_size // 5) == 0 or idx == pop_size - 1:
+                        logger.info("  Combo %d/%d done (%.1fs)", idx + 1, pop_size, elapsed)
                 except Exception as e:
                     logger.error("Combo %d failed: %s", combo.combo_id, e)
                     results.append(EvaluationResult(combo=combo, fitness=FitnessScore(), error=str(e)))

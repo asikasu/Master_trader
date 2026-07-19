@@ -54,8 +54,12 @@ class EvolutionaryTrainer:
         return df
 
     def run_evolution(self, generations: int = 10, population: int = 100,
-                      resume: bool = True, state_dir: str = ".") -> EvolutionaryEngine:
+                      resume: bool = True, state_dir: str = ".",
+                      sample_size: int = 0) -> EvolutionaryEngine:
         data = self.prepare_data()
+        if sample_size > 0 and sample_size < len(data):
+            logger.info("Sampling first %d rows for evolution (total: %d)", sample_size, len(data))
+            data = data.iloc[:sample_size].copy()
         engine = EvolutionaryEngine(
             data=data,
             feature_columns=FEATURE_COLUMNS,
