@@ -473,7 +473,7 @@ if __name__ == "__main__":
     try:
         bot = TournamentBot()
         if args.mode in ("TRAIN", "BOTH"):
-            bot.run_train()
+            bot.run_train(n_rows=args.sample)
         if args.mode in ("EVOLVE", "BOTH"):
             bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample)
         if args.mode == "LIVE":
