@@ -86,27 +86,28 @@ class TournamentBot:
             pass
 
     def _prepare_live_data(self, symbol="XAUUSD"):
-        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. LIVE горимд л ашиглана."""
+        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. Parquet-д хэзээ ч ханддаггүй."""
         if not self.executor.connected:
-            logging.warning("MT5 not connected, falling back to parquet")
-            return self._prepare_data()
+            logging.warning("MT5 not connected, using cached data")
+            return self._cached_data
         sym = self.executor._resolve_symbol(symbol)
         rates = self.executor.mt5.copy_rates_from_pos(sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
         if rates is None or len(rates) == 0:
-            logging.warning("MT5 no data for %s (err: %s), falling back to parquet",
-                            sym, self.executor.mt5.last_error())
-            return self._prepare_data()
+            logging.warning("MT5 no data for %s, using cached data", sym)
+            return self._cached_data
         df = pd.DataFrame(rates)
         dt = pd.to_datetime(df["time"], unit="s")
         df["DATE"] = dt.dt.strftime("%Y.%m.%d")
         df["TIME"] = dt.dt.strftime("%H:%M:%S")
         df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
         logging.info("Live data: %d rows from %s", len(df), sym)
-        return self._prepare_data(df)
+        result = self._prepare_data(df)
+        self._cached_data = result
+        return result
 
-    def _prepare_data(self, df=None):
+    def _prepare_data(self, df=None, n_rows=500):
         if df is None:
-            df = self.loader.load_gold_data()
+            df = self.loader.load_gold_data(n_rows=n_rows)
         raw_count = len(df)
         df = self.features.add_features(df)
         future_move = df["CLOSE"].shift(-60) - df["CLOSE"]
@@ -115,9 +116,9 @@ class TournamentBot:
         logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
         return df
 
-    def run_train(self):
+    def run_train(self, n_rows=500):
         print("=== TRAIN MODE ===")
-        gold = self._prepare_data()
+        gold = self._prepare_data(n_rows=n_rows)
         X = gold[self.feature_list]
         y = gold["Target"]
         print(f"Train rows: {len(X)}  (0: {sum(y==0)}, 1: {sum(y==1)})")
@@ -296,10 +297,9 @@ class TournamentBot:
 
         self.ai.load()
 
+        self._cached_data = None
         gold = self._prepare_live_data()
         X = gold[self.feature_list]
-
-        self._init_healing()
 
         balance = self._load_state()
 
@@ -373,8 +373,8 @@ class TournamentBot:
                     time.sleep(60)
                     continue
 
-                if self.healing_engine.should_retrain(now):
-                    print("[RETRAIN] Weekly retrain with fresh data...")
+                if now - last_train_time > timedelta(days=7):
+                    print("[RETRAIN] Weekly retrain with fresh MT5 data...")
                     gold = self._prepare_live_data()
                     X = gold[self.feature_list]
                     y = gold["Target"]

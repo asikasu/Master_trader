@@ -104,7 +104,8 @@ class DataLoader:
 
     def _load_parquet(
         self,
-        filename
+        filename,
+        n_rows=None,
     ):
 
         file = (
@@ -120,7 +121,8 @@ class DataLoader:
 
         df = self._fix_dataframe(df)
 
-        df = df.tail(500)
+        if n_rows:
+            df = df.tail(n_rows)
 
         print(f"Loaded {len(df):,} rows")
 
@@ -130,10 +132,11 @@ class DataLoader:
     # GOLD
     # =====================
 
-    def load_gold_data(self):
+    def load_gold_data(self, n_rows=500):
 
         return self._load_parquet(
-            "MASTER_GOLD_10Y.parquet"
+            "MASTER_GOLD_10Y.parquet",
+            n_rows=n_rows,
         )
 
     # =====================
