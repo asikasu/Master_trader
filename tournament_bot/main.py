@@ -50,16 +50,23 @@ class TournamentBot:
         self.news_filter = NewsFilter()
         self.mtf_filter = MTFFilter()
         self.executor = MT5Executor(spread_filter=self.spread_filter, news_filter=self.news_filter)
-        self.rules = RulesEngine(spread_bps=2.0)
+        self._best_xgb_config = None
+        self._best_trading_config = None
+        self._load_best_evolution_params()
+        tc = self._best_trading_config
+        if tc:
+            self.rules = RulesEngine(spread_bps=2.0, buy_threshold=tc.buy_threshold,
+                                     sell_threshold=tc.sell_threshold,
+                                     stop_loss_pct=tc.stop_loss_pct,
+                                     take_profit_pct=tc.take_profit_pct)
+        else:
+            self.rules = RulesEngine(spread_bps=2.0)
         self.best_f1 = 0.50
         self.feature_list = FEATURE_COLUMNS
         self.healing_engine = None
         self.dashboard = Dashboard()
         self._running = False
         self.scan_interval = 15
-        self._best_xgb_config = None
-        self._best_trading_config = None
-        self._load_best_evolution_params()
         self.ai = AIModel(xgb_config=self._best_xgb_config)
 
     def _load_best_evolution_params(self):

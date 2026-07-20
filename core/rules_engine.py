@@ -9,10 +9,13 @@ logger = logging.getLogger(__name__)
 class RulesEngine:
     """Post-filter rules to add Risk-Aware & sanity checks on ML signals."""
 
-    def __init__(self, spread_bps=2.0, min_tp_atr=1.0, max_sl_atr=3.0):
+    def __init__(self, spread_bps=2.0, buy_threshold=0.80, sell_threshold=0.20,
+                 stop_loss_pct=0.005, take_profit_pct=0.011):
         self.spread_bps = spread_bps
-        self.min_tp_atr = min_tp_atr
-        self.max_sl_atr = max_sl_atr
+        self.buy_threshold = buy_threshold
+        self.sell_threshold = sell_threshold
+        self.stop_loss_pct = stop_loss_pct
+        self.take_profit_pct = take_profit_pct
 
     def compute_atr(self, df: pd.DataFrame, period: int = 14) -> float:
         high, low, close = df["HIGH"], df["LOW"], df["CLOSE"]
@@ -21,13 +24,13 @@ class RulesEngine:
                         (low - close.shift(1)).abs()], axis=1).max(axis=1)
         return tr.rolling(period).mean().iloc[-1]
 
-    def calculate_sl_tp(self, df: pd.DataFrame, side: str, atr: float, entry: float):
+    def calculate_sl_tp(self, side: str, entry: float):
         if side == "BUY":
-            sl = entry - atr * 1.5
-            tp = entry + atr * 2.0
+            sl = entry * (1 - self.stop_loss_pct)
+            tp = entry * (1 + self.take_profit_pct)
         else:
-            sl = entry + atr * 1.5
-            tp = entry - atr * 2.0
+            sl = entry * (1 + self.stop_loss_pct)
+            tp = entry * (1 - self.take_profit_pct)
         return sl, tp
 
     def validate_signal(self, row: pd.Series, prob: float, df: pd.DataFrame) -> dict:
@@ -38,24 +41,22 @@ class RulesEngine:
 
         ema20 = row.get("EMA20", row.get("CLOSE"))
         ema50 = row.get("EMA50", row.get("CLOSE"))
-        atr = self.compute_atr(df)
         entry = row["CLOSE"]
 
-        bid = entry
-        ask = entry
-
-        spread = (ask - bid) / bid * 10000 if bid > 0 else 0
+        spread = 0
+        if "SPREAD" in row:
+            spread = row["SPREAD"]
         if spread > self.spread_bps:
             result["reason"] = f"Spread too high: {spread:.1f} bps"
             return result
 
-        if prob >= 0.80 and ema20 > ema50:
+        if prob >= self.buy_threshold and ema20 > ema50:
             side = "BUY"
-            sl, tp = self.calculate_sl_tp(df, side, atr, entry)
+            sl, tp = self.calculate_sl_tp(side, entry)
             result.update({"signal": "BUY", "side": "BUY", "sl": sl, "tp": tp})
-        elif prob <= 0.20 and ema20 < ema50:
+        elif prob <= self.sell_threshold and ema20 < ema50:
             side = "SELL"
-            sl, tp = self.calculate_sl_tp(df, side, atr, entry)
+            sl, tp = self.calculate_sl_tp(side, entry)
             result.update({"signal": "SELL", "side": "SELL", "sl": sl, "tp": tp})
         else:
             result["reason"] = f"Probability={prob:.2f}, EMA20={ema20:.2f} vs EMA50={ema50:.2f}"
