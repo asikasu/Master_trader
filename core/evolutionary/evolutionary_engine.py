@@ -71,7 +71,7 @@ class EvolutionaryEngine:
         for i in range(10):
             xgb_variants = [
                 XGBoostConfig(n_estimators=v, max_depth=d, learning_rate=lr)
-                for v in [100, 300, 500, 700, 1000]
+                for v in [50, 100, 200, 300, 400]
                 for d in [4, 6, 8, 10, 12]
                 for lr in [0.01, 0.02, 0.05, 0.1]
             ]

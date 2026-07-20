@@ -9,3 +9,4 @@ __pycache__/
 *.lnk
 best_params.json
 evolution_state.json
+config.json

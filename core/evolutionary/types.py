@@ -11,8 +11,8 @@ class ParameterDomain(enum.Enum):
 
 @dataclasses.dataclass(frozen=True)
 class XGBoostConfig:
-    n_estimators: int = 1000
-    max_depth: int = 8
+    n_estimators: int = 100
+    max_depth: int = 4
     learning_rate: float = 0.02
     subsample: float = 0.8
     colsample_bytree: float = 0.8

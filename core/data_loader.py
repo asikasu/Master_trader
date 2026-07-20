@@ -120,6 +120,8 @@ class DataLoader:
 
         df = self._fix_dataframe(df)
 
+        df = df.tail(500)
+
         print(f"Loaded {len(df):,} rows")
 
         return df

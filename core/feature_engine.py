@@ -22,7 +22,8 @@ class FeatureEngine:
 
         if "DATE" in df.columns and "TIME" in df.columns:
             df["DATETIME"] = pd.to_datetime(
-                df["DATE"].astype(str) + " " + df["TIME"].astype(str)
+                df["DATE"].astype(str) + " " + df["TIME"].astype(str),
+                format="%Y.%m.%d %H:%M:%S", errors="coerce"
             )
             df["WEEKDAY"] = df["DATETIME"].dt.weekday
             df["HOUR"] = df["DATETIME"].dt.hour
@@ -171,7 +172,8 @@ class FeatureEngine:
         df = df.replace([float('inf'), -float('inf')], float('nan'))
 
         before_drop = len(df)
-        df = df.dropna()
+        needed = ["CLOSE", "Target"] if "Target" in df.columns else ["CLOSE"]
+        df = df.dropna(subset=needed)
         print(f"DEBUG add_features: dropped {before_drop - len(df)} rows (NaN). remaining={len(df)}")
 
         return df
