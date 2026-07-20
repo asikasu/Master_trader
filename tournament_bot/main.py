@@ -31,11 +31,14 @@ from core.evolutionary.persistence import load_best_params, load_state
 from core.evolutionary.types import ParameterCombo, XGBoostConfig, TradingConfig
 from tournament_bot.dashboard import Dashboard
 
+import json
+
 KELLY_FRACTION = 0.25
 MAX_RISK_PER_TRADE = 0.02
 TRAILING_ACTIVATE = 0.5
 BREAK_EVEN_ACTIVATE = 0.3
 PARTIAL_CLOSE_RATIO = 0.5
+STATE_FILE = "live_state.json"
 
 
 class TournamentBot:
@@ -55,11 +58,32 @@ class TournamentBot:
         self.healing_engine = None
         self.dashboard = Dashboard()
         self._running = False
-        self.scan_interval = 5
+        self.scan_interval = 15
         self._kelly_win_rate = 0.55
         self._kelly_avg_win = 1.0
         self._kelly_avg_loss = 1.0
         self._raw_data_store = None
+
+    def _load_state(self):
+        try:
+            with open(STATE_FILE) as f:
+                s = json.load(f)
+            self._kelly_avg_win = s.get("avg_win", 1.0)
+            self._kelly_avg_loss = s.get("avg_loss", 1.0)
+            return s.get("balance", 10000.0)
+        except (FileNotFoundError, json.JSONDecodeError):
+            return 10000.0
+
+    def _save_state(self, balance):
+        try:
+            with open(STATE_FILE, "w") as f:
+                json.dump({
+                    "balance": balance,
+                    "avg_win": self._kelly_avg_win,
+                    "avg_loss": self._kelly_avg_loss,
+                }, f)
+        except Exception:
+            pass
 
     def _prepare_data(self, df=None):
         if df is None:
@@ -226,6 +250,16 @@ class TournamentBot:
                     return p
         return None
 
+    def _reconnect_mt5(self):
+        if self.executor.connected:
+            return True
+        for attempt in range(3):
+            logging.info("MT5 reconnect attempt %d...", attempt + 1)
+            if self.executor.initialize():
+                return True
+            time.sleep(2)
+        return False
+
     def run_live(self, symbol="XAUUSD"):
         print("=== LIVE TRADING MODE ===")
         mt5_ok = self.executor.initialize()
@@ -239,6 +273,8 @@ class TournamentBot:
 
         self._init_healing()
 
+        balance = self._load_state()
+
         self.dashboard.update(
             mode="LIVE",
             mt5_status="connected" if mt5_ok else "simulation",
@@ -246,6 +282,7 @@ class TournamentBot:
         self._running = True
 
         def handle_stop(sig, frame):
+            self._save_state(balance)
             self._running = False
         signal.signal(signal.SIGINT, handle_stop)
         signal.signal(signal.SIGTERM, handle_stop)
@@ -255,15 +292,18 @@ class TournamentBot:
 
         last_train_time = datetime.now()
         signal_count = 0
-        balance = 10000.0
-        last_entry_price = None
         entry_sl = None
         entry_tp = None
 
         while self._running:
             try:
                 now = datetime.now()
-                self.dashboard.update(news_block=self.news_filter.is_news_event(now))
+
+                if not self.executor.connected:
+                    if not self._reconnect_mt5():
+                        logging.error("MT5 reconnection failed. Retrying in 30s.")
+                        time.sleep(30)
+                        continue
 
                 if self.news_filter.is_news_event(now):
                     print("[NEWS] Medeenii uyed arijaag zasvarlaj baina.")
@@ -290,12 +330,14 @@ class TournamentBot:
                         balance += real_pnl
                         self._kelly_avg_loss = (self._kelly_avg_loss * 9 + abs(real_pnl)) / 10
                         self.healing_engine.on_trade_result(-1)
+                        self._save_state(balance)
                         print(f"[CLOSE] SL_HIT PnL={real_pnl:.2f} Bal={balance:.2f}")
                         entry_sl = entry_tp = None
                     elif result == "TP_HIT":
                         balance += real_pnl
                         self._kelly_avg_win = (self._kelly_avg_win * 9 + real_pnl) / 10
                         self.healing_engine.on_trade_result(1)
+                        self._save_state(balance)
                         print(f"[CLOSE] TP_HIT PnL={real_pnl:.2f} Bal={balance:.2f}")
                         entry_sl = entry_tp = None
                     elif result == "HOLDING":
@@ -355,10 +397,17 @@ class TournamentBot:
 
                 time.sleep(self.scan_interval)
 
+            except (ConnectionError, TimeoutError, ValueError, OSError) as e:
+                logging.error("LIVE recoverable error: %s", e)
+                self._save_state(balance)
+                time.sleep(30)
             except Exception as e:
-                logging.error("LIVE loop error: %s", e)
-                time.sleep(10)
+                logging.critical("LIVE unrecoverable error: %s", e, exc_info=True)
+                self._save_state(balance)
+                print(f"[CRITICAL] Bot stopped: {e}")
+                self._running = False
 
+        self._save_state(balance)
         self.executor.shutdown()
         print(f"LIVE stopped. Signals: {signal_count}, Final Bal: {balance:.2f}")
 
