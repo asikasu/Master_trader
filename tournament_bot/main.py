@@ -118,15 +118,23 @@ class TournamentBot:
             logging.warning("MT5 not connected, using cached data")
             return self._cached_data
         sym = self.executor._resolve_symbol(symbol)
-        rates = self.executor.mt5.copy_rates_from_pos(sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
+        try:
+            rates = self.executor.mt5.copy_rates_from_pos(sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
+        except Exception as e:
+            logging.error("MT5 copy_rates_from_pos failed: %s, using cached data", e)
+            return self._cached_data
         if rates is None or len(rates) == 0:
-            logging.warning("MT5 no data for %s, using cached data", sym)
+            logging.warning("MT5 no data for %s (err: %s), using cached data",
+                            sym, self.executor.mt5.last_error())
             return self._cached_data
         df = pd.DataFrame(rates)
         dt = pd.to_datetime(df["time"], unit="s")
         df["DATE"] = dt.dt.strftime("%Y.%m.%d")
         df["TIME"] = dt.dt.strftime("%H:%M:%S")
         df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
+        tick = self.executor.mt5.symbol_info_tick(sym)
+        last_spread = (tick.ask - tick.bid) / tick.bid * 10000 if tick and tick.bid > 0 else 1.0
+        df["SPREAD"] = last_spread
         logging.info("Live data: %d rows from %s", len(df), sym)
         result = self._prepare_data(df)
         self._cached_data = result
