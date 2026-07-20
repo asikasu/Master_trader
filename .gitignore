@@ -10,3 +10,5 @@ __pycache__/
 best_params.json
 evolution_state.json
 config.json
+bot.log
+live_state.json

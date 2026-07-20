@@ -255,10 +255,17 @@ class TournamentBot:
     def _reconnect_mt5(self):
         if self.executor.connected:
             return True
+        logging.warning("MT5 disconnected. Checking terminal status...")
         for attempt in range(3):
+            try:
+                info = self.executor.mt5.terminal_info()
+                if info is not None:
+                    self.executor.connected = True
+                    return True
+            except Exception:
+                pass
             logging.info("MT5 reconnect attempt %d...", attempt + 1)
-            if self.executor.initialize():
-                return True
+            self.executor.initialize()
             time.sleep(2)
         return False
 
@@ -301,12 +308,6 @@ class TournamentBot:
             try:
                 now = datetime.now()
 
-                if not self.executor.connected:
-                    if not self._reconnect_mt5():
-                        logging.error("MT5 reconnection failed. Retrying in 30s.")
-                        time.sleep(30)
-                        continue
-
                 if self.news_filter.is_news_event(now):
                     print("[NEWS] Medeenii uyed arijaag zasvarlaj baina.")
                     time.sleep(60)
@@ -321,9 +322,11 @@ class TournamentBot:
 
                 if open_pos:
                     tick = self.executor.mt5.symbol_info_tick(symbol) if self.executor.connected else None
-                    if not tick:
+                    if not tick and not self._reconnect_mt5():
                         time.sleep(self.scan_interval)
                         continue
+                    if not tick:
+                        tick = self.executor.mt5.symbol_info_tick(symbol)
                     price = tick.bid
                     result = self._manage_open_position(open_pos, price, current_atr, entry_sl, entry_tp)
                     real_pnl = open_pos.profit if self.executor.connected else 0.0
