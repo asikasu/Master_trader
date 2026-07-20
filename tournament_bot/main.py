@@ -85,18 +85,21 @@ class TournamentBot:
         except Exception:
             pass
 
-    def _prepare_live_data(self):
+    def _prepare_live_data(self, symbol="XAUUSD"):
         """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. LIVE горимд л ашиглана."""
         if not self.executor.connected:
             logging.warning("MT5 not connected, falling back to parquet")
             return self._prepare_data()
-        rates = self.executor.mt5.copy_rates_from_pos("XAUUSD", self.executor.mt5.TIMEFRAME_H1, 0, 500)
+        sym = self.executor._resolve_symbol(symbol)
+        rates = self.executor.mt5.copy_rates_from_pos(sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
         if rates is None or len(rates) == 0:
-            logging.warning("MT5 no data, falling back to parquet")
+            logging.warning("MT5 no data for %s (err: %s), falling back to parquet",
+                            sym, self.executor.mt5.last_error())
             return self._prepare_data()
         df = pd.DataFrame(rates)
         df["DATE"] = pd.to_datetime(df["time"], unit="s")
         df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
+        logging.info("Live data: %d rows from %s", len(df), sym)
         return self._prepare_data(df)
 
     def _prepare_data(self, df=None):
