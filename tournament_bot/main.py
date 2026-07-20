@@ -404,8 +404,9 @@ class TournamentBot:
             except Exception as e:
                 logging.critical("LIVE unrecoverable error: %s", e, exc_info=True)
                 self._save_state(balance)
-                print(f"[CRITICAL] Bot stopped: {e}")
-                self._running = False
+                print(f"[CRITICAL] Bot crashed: {e}")
+                self.executor.shutdown()
+                sys.exit(1)
 
         self._save_state(balance)
         self.executor.shutdown()
