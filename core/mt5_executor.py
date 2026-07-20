@@ -78,6 +78,23 @@ class MT5Executor:
         logger.info("Order placed: ticket=%d", result.order)
         return result.order
 
+    def modify_position(self, ticket, sl, tp):
+        if not self.connected:
+            logger.info("[SIM] Modify ticket=%d sl=%.5f tp=%.5f", ticket, sl, tp)
+            return True
+        request = {
+            "action": self.mt5.TRADE_ACTION_SLTP,
+            "position": ticket,
+            "sl": sl,
+            "tp": tp,
+        }
+        result = self.mt5.order_send(request)
+        if result.retcode != self.mt5.TRADE_RETCODE_DONE:
+            logger.error("Modify failed: %s (retcode=%d)", result.comment, result.retcode)
+            return False
+        logger.info("Position %d modified: sl=%.5f tp=%.5f", ticket, sl, tp)
+        return True
+
     def close_position(self, ticket):
         if not self.connected:
             logger.info("[SIM] Close ticket=%d", ticket)

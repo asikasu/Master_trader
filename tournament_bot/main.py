@@ -167,61 +167,45 @@ class TournamentBot:
         positions = self.executor.positions()
         return [p for p in positions if p.symbol == symbol] if positions else []
 
-    def _manage_open_position(self, pos, current_price, atr):
-        """Manage position: SL/TP + trailing + break even + partial close."""
+    def _manage_open_position(self, pos, current_price, atr, entry_sl, entry_tp):
+        """Modify SL/TP only, no close/reopen. Returns status string."""
         side = "BUY" if pos.type == 0 else "SELL"
         entry = pos.price_open
         direction = 1 if side == "BUY" else -1
         pnl_pct = (current_price - entry) / entry * direction
 
         if pnl_pct <= -0.02:
-            self.executor.close_position(pos.ticket)
             return "SL_HIT"
 
         if pnl_pct >= 0.02:
-            self.executor.close_position(pos.ticket)
             return "TP_HIT"
 
-        if pnl_pct >= BREAK_EVEN_ACTIVATE * 0.01 and hasattr(pos, 'sl') and pos.sl:
-            new_sl = entry * (1 + 0.001 * direction)
-            if (side == "BUY" and new_sl > pos.sl) or (side == "SELL" and new_sl < pos.sl):
-                self.executor.close_position(pos.ticket)
-                new_ticket = self.executor.place_order(
-                    pos.symbol, pos.type, pos.volume * 0.5,
-                    current_price, new_sl, pos.tp, "breakeven"
-                )
-                if new_ticket:
-                    return "PARTIAL_BE"
-            return "BREAK_EVEN"
+        new_sl = pos.sl
+        new_tp = pos.tp
+
+        if pnl_pct >= BREAK_EVEN_ACTIVATE * 0.01:
+            be_sl = entry * (1 + 0.001 * direction)
+            if (side == "BUY" and be_sl > pos.sl) or (side == "SELL" and be_sl < pos.sl):
+                new_sl = be_sl
 
         if pnl_pct >= TRAILING_ACTIVATE * 0.01:
             trail_dist = atr * 1.5
             if side == "BUY":
-                new_sl = current_price - trail_dist
-                if new_sl > pos.sl:
-                    self.executor.close_position(pos.ticket)
-                    new_ticket = self.executor.place_order(
-                        pos.symbol, pos.type, pos.volume,
-                        current_price, new_sl, pos.tp, "trailing"
-                    )
-                    if new_ticket:
-                        return "TRAILED"
+                proposed = current_price - trail_dist
+                if proposed > new_sl:
+                    new_sl = proposed
             else:
-                new_sl = current_price + trail_dist
-                if new_sl < pos.sl:
-                    self.executor.close_position(pos.ticket)
-                    new_ticket = self.executor.place_order(
-                        pos.symbol, pos.type, pos.volume,
-                        current_price, new_sl, pos.tp, "trailing"
-                    )
-                    if new_ticket:
-                        return "TRAILED"
-            return "TRAILING"
+                proposed = current_price + trail_dist
+                if proposed < new_sl:
+                    new_sl = proposed
+
+        if (new_sl != pos.sl or new_tp != pos.tp):
+            self.executor.modify_position(pos.ticket, new_sl, new_tp)
 
         return "HOLDING"
 
-    def _kelly_lot(self, prob, balance):
-        if prob <= 0.5:
+    def _kelly_lot(self, prob, balance, sl_points):
+        if prob <= 0.5 or sl_points <= 0:
             return 0.01
         win_rate = prob
         loss_rate = 1 - prob
@@ -230,8 +214,17 @@ class TournamentBot:
         b = avg_win / avg_loss
         kelly_pct = (win_rate - loss_rate / b) * KELLY_FRACTION
         risk_amount = balance * min(MAX_RISK_PER_TRADE, max(kelly_pct, 0.001))
-        lot = risk_amount / 100.0
+        tick_value = 1.0
+        lot = risk_amount / (sl_points * tick_value)
         return round(max(min(lot, 1.0), 0.01), 2)
+
+    def _sync_open_positions(self, symbol):
+        positions = self.executor.positions()
+        if self.executor.connected and positions:
+            for p in positions:
+                if p.symbol == symbol:
+                    return p
+        return None
 
     def run_live(self, symbol="XAUUSD"):
         print("=== LIVE TRADING MODE ===")
@@ -261,10 +254,11 @@ class TournamentBot:
         dashboard_thread.start()
 
         last_train_time = datetime.now()
-        open_ticket = None
         signal_count = 0
         balance = 10000.0
-        retrain_day_count = 0
+        last_entry_price = None
+        entry_sl = None
+        entry_tp = None
 
         while self._running:
             try:
@@ -272,7 +266,6 @@ class TournamentBot:
                 self.dashboard.update(news_block=self.news_filter.is_news_event(now))
 
                 if self.news_filter.is_news_event(now):
-                    open_ticket = None
                     print("[NEWS] Medeenii uyed arijaag zasvarlaj baina.")
                     time.sleep(60)
                     continue
@@ -282,24 +275,31 @@ class TournamentBot:
                 last_row = gold.iloc[-1]
                 current_atr = last_row.get("ATR14", 10.0)
 
-                if open_ticket:
+                open_pos = self._sync_open_positions(symbol)
+
+                if open_pos:
                     tick = self.executor.mt5.symbol_info_tick(symbol) if self.executor.connected else None
-                    if tick:
-                        price = tick.bid
-                        result = self._manage_open_position(open_ticket, price, current_atr)
-                        pnl = (price - open_ticket.price_open) * open_ticket.volume * 100
-                        if result in ("SL_HIT",):
-                            balance -= abs(pnl)
-                            self._kelly_avg_loss = (self._kelly_avg_loss * 9 + abs(pnl)) / 10
-                            self.healing_engine.on_trade_result(-1)
-                        elif result in ("TP_HIT", "PARTIAL_BE"):
-                            balance += pnl
-                            self._kelly_avg_win = (self._kelly_avg_win * 9 + pnl) / 10
-                            self.healing_engine.on_trade_result(1)
-                        if result in ("SL_HIT", "TP_HIT"):
-                            print(f"[CLOSE] {result} PnL={pnl:.2f}")
-                            open_ticket = None
-                        print(f"[POS] Price={price:.2f} PnL={pnl:.2f} Bal={balance:.2f}")
+                    if not tick:
+                        time.sleep(self.scan_interval)
+                        continue
+                    price = tick.bid
+                    result = self._manage_open_position(open_pos, price, current_atr, entry_sl, entry_tp)
+                    real_pnl = open_pos.profit if self.executor.connected else 0.0
+
+                    if result == "SL_HIT":
+                        balance += real_pnl
+                        self._kelly_avg_loss = (self._kelly_avg_loss * 9 + abs(real_pnl)) / 10
+                        self.healing_engine.on_trade_result(-1)
+                        print(f"[CLOSE] SL_HIT PnL={real_pnl:.2f} Bal={balance:.2f}")
+                        entry_sl = entry_tp = None
+                    elif result == "TP_HIT":
+                        balance += real_pnl
+                        self._kelly_avg_win = (self._kelly_avg_win * 9 + real_pnl) / 10
+                        self.healing_engine.on_trade_result(1)
+                        print(f"[CLOSE] TP_HIT PnL={real_pnl:.2f} Bal={balance:.2f}")
+                        entry_sl = entry_tp = None
+                    elif result == "HOLDING":
+                        print(f"[POS] Price={price:.2f} PnL={real_pnl:.2f} Bal={balance:.2f}")
                     time.sleep(self.scan_interval)
                     continue
 
@@ -316,7 +316,6 @@ class TournamentBot:
                     self.ai.train(X_train, y_train)
                     self.ai.save()
                     last_train_time = now
-                    retrain_day_count = 0
 
                 prob = self.ai.predict_probability(X.iloc[-1:])
                 sig = self.rules.validate_signal(last_row, prob, gold)
@@ -334,7 +333,8 @@ class TournamentBot:
                 )
 
                 if sig["signal"] in ("BUY", "SELL"):
-                    lot = self._kelly_lot(mtf_result["confidence"], balance)
+                    sl_points = abs(sig["sl"] - last_row["CLOSE"]) if sig["sl"] else current_atr
+                    lot = self._kelly_lot(mtf_result["confidence"], balance, sl_points)
                     if lot > 0.01:
                         if self.executor.connected:
                             tick = self.executor.mt5.symbol_info_tick(symbol)
@@ -348,7 +348,8 @@ class TournamentBot:
                             comment=f"kelly_{prob:.2f}",
                         )
                         if ticket:
-                            open_ticket = ticket
+                            entry_sl = sig["sl"]
+                            entry_tp = sig["tp"]
                             signal_count += 1
                             print(f"[OPEN] {sig['signal']} Lot={lot:.2f} Price={price:.2f} SL={sig['sl']:.2f} TP={sig['tp']:.2f} Bal={balance:.2f}")
 
