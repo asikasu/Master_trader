@@ -137,9 +137,9 @@ class TournamentBot:
             df = self.loader.load_gold_data(n_rows=n_rows)
         raw_count = len(df)
         df = self.features.add_features(df)
-        future_move = df["CLOSE"].shift(-60) - df["CLOSE"]
-        df["Target"] = (future_move > df["ATR14"] * 0.5).astype(int)
-        df = df.iloc[:-60].dropna(subset=["Target", "CLOSE"]).copy()
+        future_move = df["CLOSE"].shift(-1) - df["CLOSE"]
+        df["Target"] = (future_move > 0).astype(int)
+        df = df.iloc[:-1].dropna(subset=["Target", "CLOSE"]).copy()
         logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
         return df
 
