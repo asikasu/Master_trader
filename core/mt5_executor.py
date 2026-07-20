@@ -20,6 +20,16 @@ class MT5Executor:
             self.connected = mt5.initialize()
             if self.connected:
                 logger.info("MT5 initialized")
+                info = mt5.terminal_info()
+                if info:
+                    logger.info("Terminal: server=%s, trade_mode=%d",
+                                info.server, info.trade_mode)
+                account = mt5.account_info()
+                if account:
+                    logger.info("Account: login=%d, balance=%.2f", account.login, account.balance)
+                symbols = [s.name for s in mt5.symbols_get() or []]
+                xau = [s for s in symbols if "XAU" in s.upper()]
+                logger.info("Available XAU symbols: %s", xau)
             else:
                 logger.error("MT5 init failed: %s", mt5.last_error())
             return self.connected
