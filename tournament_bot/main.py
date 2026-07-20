@@ -88,10 +88,12 @@ class TournamentBot:
     def _prepare_data(self, df=None):
         if df is None:
             df = self.loader.load_gold_data()
+        raw_count = len(df)
         df = self.features.add_features(df)
         future_move = df["CLOSE"].shift(-60) - df["CLOSE"]
         df["Target"] = (future_move > df["ATR14"] * 0.5).astype(int)
         df = df.iloc[:-60].dropna(subset=["Target", "CLOSE"]).copy()
+        logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
         return df
 
     def run_train(self):
@@ -362,6 +364,8 @@ class TournamentBot:
                 prob = self.ai.predict_probability(X.iloc[-1:])
                 sig = self.rules.validate_signal(last_row, prob, gold)
                 mtf_result = self.mtf_filter.confirm(gold, prob, sig["signal"])
+                logging.info("Signal: prob=%.3f raw=%s mtf=%s/%s",
+                             prob, sig["signal"], mtf_result["signal"], mtf_result.get("reason",""))
                 sig["signal"] = mtf_result["signal"]
                 sig["reason"] = mtf_result["reason"]
 
@@ -384,6 +388,8 @@ class TournamentBot:
                         else:
                             price = last_row["CLOSE"]
                         order_type = 0 if sig["signal"] == "BUY" else 1
+                        logging.info("Placing order: %s lot=%.2f price=%.2f sl=%.2f tp=%.2f",
+                                      sig["signal"], lot, price, sig["sl"], sig["tp"])
                         ticket = self.executor.place_order(
                             symbol, order_type, lot, price,
                             sig["sl"], sig["tp"],
@@ -394,6 +400,11 @@ class TournamentBot:
                             entry_tp = sig["tp"]
                             signal_count += 1
                             print(f"[OPEN] {sig['signal']} Lot={lot:.2f} Price={price:.2f} SL={sig['sl']:.2f} TP={sig['tp']:.2f} Bal={balance:.2f}")
+                        else:
+                            logging.warning("Place order returned no ticket")
+                    else:
+                        logging.info("Lot too small: %.3f (prob=%.3f, balance=%.2f, sl_pts=%.1f)",
+                                     lot, prob, balance, sl_points)
 
                 time.sleep(self.scan_interval)
 
@@ -428,8 +439,14 @@ if __name__ == "__main__":
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args()
 
-    logging.basicConfig(level=getattr(logging, args.log_level),
-                        format="%(asctime)s [%(levelname)s] %(message)s")
+    logging.basicConfig(
+        level=getattr(logging, args.log_level),
+        format="%(asctime)s [%(levelname)s] %(message)s",
+        handlers=[
+            logging.FileHandler("bot.log", encoding="utf-8"),
+            logging.StreamHandler(),
+        ],
+    )
 
     try:
         bot = TournamentBot()
