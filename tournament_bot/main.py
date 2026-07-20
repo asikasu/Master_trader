@@ -85,6 +85,20 @@ class TournamentBot:
         except Exception:
             pass
 
+    def _prepare_live_data(self):
+        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. LIVE горимд л ашиглана."""
+        if not self.executor.connected:
+            logging.warning("MT5 not connected, falling back to parquet")
+            return self._prepare_data()
+        rates = self.executor.mt5.copy_rates_from_pos("XAUUSD", self.executor.mt5.TIMEFRAME_H1, 0, 500)
+        if rates is None or len(rates) == 0:
+            logging.warning("MT5 no data, falling back to parquet")
+            return self._prepare_data()
+        df = pd.DataFrame(rates)
+        df["DATE"] = pd.to_datetime(df["time"], unit="s")
+        df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
+        return self._prepare_data(df)
+
     def _prepare_data(self, df=None):
         if df is None:
             df = self.loader.load_gold_data()
@@ -277,7 +291,7 @@ class TournamentBot:
 
         self.ai.load()
 
-        gold = self._prepare_data()
+        gold = self._prepare_live_data()
         X = gold[self.feature_list]
 
         self._init_healing()
@@ -313,7 +327,7 @@ class TournamentBot:
                     time.sleep(60)
                     continue
 
-                gold = self._prepare_data()
+                gold = self._prepare_live_data()
                 X = gold[self.feature_list]
                 last_row = gold.iloc[-1]
                 current_atr = last_row.get("ATR14", 10.0)
@@ -356,7 +370,7 @@ class TournamentBot:
 
                 if self.healing_engine.should_retrain(now):
                     print("[RETRAIN] Weekly retrain with fresh data...")
-                    gold = self._prepare_data()
+                    gold = self._prepare_live_data()
                     X = gold[self.feature_list]
                     y = gold["Target"]
                     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, shuffle=False)
