@@ -45,8 +45,6 @@ class TournamentBot:
     def __init__(self):
         self.loader = DataLoader("data")
         self.features = FeatureEngine()
-        self.ai = AIModel()
-        self.risk = RiskManager()
         self.evo_trainer = EvolutionaryTrainer("data")
         self.spread_filter = SpreadFilter(max_spread_bps=2.0)
         self.news_filter = NewsFilter()
@@ -59,6 +57,28 @@ class TournamentBot:
         self.dashboard = Dashboard()
         self._running = False
         self.scan_interval = 15
+        self._best_xgb_config = None
+        self._best_trading_config = None
+        self._load_best_evolution_params()
+        self.ai = AIModel(xgb_config=self._best_xgb_config)
+
+    def _load_best_evolution_params(self):
+        try:
+            best = load_best_params("best_params.json")
+            if best:
+                combo = best[0][0]
+                self._best_xgb_config = combo.xgb
+                self._best_trading_config = combo.trading
+                logging.info("Loaded best params: combo_id=%d n_est=%d depth=%d lr=%.3f buy_thr=%.2f sl=%.3f tp=%.3f",
+                             combo.combo_id, combo.xgb.n_estimators, combo.xgb.max_depth,
+                             combo.xgb.learning_rate, combo.trading.buy_threshold,
+                             combo.trading.stop_loss_pct, combo.trading.take_profit_pct)
+                return
+        except Exception:
+            pass
+        self._best_xgb_config = None
+        self._best_trading_config = None
+        logging.info("No best_params.json, using defaults")
         self._kelly_win_rate = 0.55
         self._kelly_avg_win = 1.0
         self._kelly_avg_loss = 1.0
