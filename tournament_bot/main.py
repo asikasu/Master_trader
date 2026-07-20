@@ -137,9 +137,9 @@ class TournamentBot:
             df = self.loader.load_gold_data(n_rows=n_rows)
         raw_count = len(df)
         df = self.features.add_features(df)
-        future_move = df["CLOSE"].shift(-1) - df["CLOSE"]
-        df["Target"] = (future_move > 0).astype(int)
-        df = df.iloc[:-1].dropna(subset=["Target", "CLOSE"]).copy()
+        future_move = df["CLOSE"].shift(-60) - df["CLOSE"]
+        df["Target"] = (future_move > df["ATR14"] * 0.5).astype(int)
+        df = df.iloc[:-60].dropna(subset=["Target", "CLOSE"]).copy()
         logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
         return df
 
@@ -193,7 +193,6 @@ class TournamentBot:
 
         prob = self.ai.predict_probability(X.iloc[-1:])
         print(f"\nProbability: {prob:.2%}")
-        print(f"Lot Size: {self.risk.get_lot_size(prob)}")
 
         now = datetime.now()
         news_warning = f" (NEXT: {self.news_filter.next_news(now)})" if self.news_filter.is_news_event(now) else ""
@@ -338,7 +337,7 @@ class TournamentBot:
 
         def handle_stop(sig, frame):
             self._save_state(balance)
-            self._running = False
+            sys.exit(0)
         signal.signal(signal.SIGINT, handle_stop)
         signal.signal(signal.SIGTERM, handle_stop)
 
@@ -350,7 +349,7 @@ class TournamentBot:
         entry_sl = None
         entry_tp = None
 
-        while self._running:
+        while True:
             try:
                 now = datetime.now()
 
