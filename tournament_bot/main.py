@@ -465,7 +465,7 @@ class TournamentBot:
                 self._save_state(balance)
                 print(f"[CRITICAL] Bot crashed: {e}")
                 self.executor.shutdown()
-                sys.exit(1)
+                raise  # гаднах while True loop барьж restart хийнэ
 
         self._save_state(balance)
         self.executor.shutdown()
@@ -503,7 +503,21 @@ if __name__ == "__main__":
         if args.mode in ("EVOLVE", "BOTH"):
             bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample)
         if args.mode == "LIVE":
-            bot.run_live(symbol=args.symbol)
+            while True:
+                try:
+                    bot.run_live(symbol=args.symbol)
+                    break
+                except (ConnectionError, TimeoutError, OSError) as e:
+                    logging.error("LIVE connection error, restarting in 10s: %s", e)
+                    time.sleep(10)
+                except SystemExit as e:
+                    if e.code == 0:
+                        break
+                    logging.error("LIVE crashed (code=%s), restarting in 5s", e.code)
+                    time.sleep(5)
+                except Exception as e:
+                    logging.critical("LIVE unexpected error: %s", e, exc_info=True)
+                    time.sleep(30)
     except Exception as e:
         import traceback
         print(f"!!! CRITICAL ERROR: {e}")
