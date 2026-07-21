@@ -316,6 +316,10 @@ class TournamentBot:
         pop = []
         results_summary = []
 
+        print("Loading full dataset once...")
+        gold = self._prepare_data()
+        print(f"Full dataset: {len(gold)} rows")
+
         for gen_i in range(n_months - window_size):
             train_months = months[gen_i:gen_i + window_size]
             test_month = months[gen_i + window_size]
@@ -325,7 +329,6 @@ class TournamentBot:
             test_y, test_m = test_month
 
             # filter train data by months
-            gold = self._prepare_data()
             def month_mask(df, y, m):
                 return (df["DATETIME"].dt.year == y) & (df["DATETIME"].dt.month == m)
             mask_train = False
