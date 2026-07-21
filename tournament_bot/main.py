@@ -299,31 +299,54 @@ class TournamentBot:
         print(f"SIGNAL: {sig['signal']} | Prob={prob:.2%} {sl_str} {tp_str}{reason}")
 
     def run_evolve(self, generations=10, population=100, sample_size=5000, year_filter=None):
-        print("=== EVOLVE MODE (Walkforward Evolutionary CV) ===")
-        generators = [
-            (2016, 2017, 2018, "Gen1"),
-            (2019, 2020, 2021, "Gen2"),
-            (2022, 2023, 2024, "Gen3"),
-        ]
+        print("=== EVOLVE MODE (Monthly Walkforward) ===")
+
+        import calendar
+        months = []
+        for y in range(2016, 2027):
+            for m in range(1, 13):
+                if y == 2026 and m > 7:
+                    break
+                months.append((y, m))
+        n_months = len(months)
+        print(f"Total months: {n_months} ({months[0][0]}.{months[0][1]:02d} - {months[-1][0]}.{months[-1][1]:02d})")
+
+        window_size = 12  # 12 months train
         n_pop = 10
         pop = []
         results_summary = []
 
-        for gen_i, (train_start, train_end, test_year, gen_name) in enumerate(generators):
-            print(f"\n{'='*60}")
-            print(f"  GENERATION {gen_name}: train={train_start}-{train_end}, test={test_year}")
-            print(f"{'='*60}")
+        for gen_i in range(n_months - window_size):
+            train_months = months[gen_i:gen_i + window_size]
+            test_month = months[gen_i + window_size]
 
-            # data - sample to 50000 for speed
-            gold = self._prepare_data(year_filter=(train_start, train_end))
-            gold = gold.sample(n=min(50000, len(gold)), random_state=42)
-            X_train = gold[self.feature_list]
-            y_train = gold["Target"]
-            test_gold = self._prepare_data(year_filter=(test_year, test_year))
-            test_gold = test_gold.sample(n=min(25000, len(test_gold)), random_state=42)
-            X_test = test_gold[self.feature_list]
-            y_test = test_gold["Target"]
-            print(f"  Train: {len(X_train)} rows (sampled), Test: {len(X_test)} rows (sampled)")
+            train_start = (train_months[0][0], train_months[0][1])
+            train_end = (train_months[-1][0], train_months[-1][1])
+            test_y, test_m = test_month
+
+            # filter train data by months
+            gold = self._prepare_data()
+            def month_mask(df, y, m):
+                return (df["DATETIME"].dt.year == y) & (df["DATETIME"].dt.month == m)
+            mask_train = False
+            for y, m in train_months:
+                mask_train |= month_mask(gold, y, m)
+            train_df = gold[mask_train].sample(n=min(10000, mask_train.sum()), random_state=42).copy()
+
+            mask_test = month_mask(gold, test_y, test_m)
+            test_df = gold[mask_test].sample(n=min(5000, mask_test.sum()), random_state=42).copy()
+
+            X_train = train_df[self.feature_list]
+            y_train = train_df["Target"]
+            X_test = test_df[self.feature_list]
+            y_test = test_df["Target"]
+
+            if len(X_train) < 100 or len(X_test) < 10:
+                continue
+
+            gen_name = f"{train_start[0]}.{train_start[1]:02d}-{train_end[0]}.{train_end[1]:02d}->{test_y}.{test_m:02d}"
+            print(f"\n  Gen#{gen_i+1}: train={gen_name}")
+            print(f"    Train={len(X_train)} Test={len(X_test)}")
 
             # first gen: create 10 bot combos
             if gen_i == 0:
@@ -343,8 +366,7 @@ class TournamentBot:
                     est = min(combo.xgb.n_estimators, 50)
                     depth = min(combo.xgb.max_depth, 6)
                     model = XGBClassifier(
-                        n_estimators=est,
-                        max_depth=depth,
+                        n_estimators=est, max_depth=depth,
                         learning_rate=combo.xgb.learning_rate,
                         subsample=combo.xgb.subsample,
                         colsample_bytree=combo.xgb.colsample_bytree,
@@ -355,22 +377,18 @@ class TournamentBot:
                     )
                     model.fit(X_train, y_train, verbose=False)
                     probs = model.predict_proba(X_test)[:, 1]
-
                     pred = (probs > 0.50).astype(int)
                     f1 = f1_score(y_test, pred, zero_division=0)
                     acc = accuracy_score(y_test, pred)
-
                     wins = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==1)
                     losses = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==0)
                     trades = wins + losses
                     wr = wins/trades if trades>0 else 0
-
                     score = f1 * 0.5 + wr * 0.3 + (acc-0.5) * 0.2
                     gen_results.append((combo, score, f1, wr, trades))
-                    print(f"  Bot #{combo.combo_id:>3}: F1={f1:.4f}  WR={wr:.2%}  trades={trades}  score={score:.4f}")
                 except Exception as e:
                     import traceback
-                    print(f"  Bot #{combo.combo_id} FAILED: {e}")
+                    print(f"    Bot #{combo.combo_id} FAILED: {e}")
                     traceback.print_exc()
                     gen_results.append((combo, 0, 0, 0, 0))
 
@@ -378,7 +396,12 @@ class TournamentBot:
             gen_results.sort(key=lambda x: x[1], reverse=True)
             top2 = [r[0] for r in gen_results[:2]]
             top2_score = gen_results[0][1]
-            print(f"\n  >> Top 2 bots: #{top2[0].combo_id} (score={top2_score:.4f}), #{top2[1].combo_id}")
+            print(f"    >> Top2: #{top2[0].combo_id} score={top2_score:.4f}")
+
+            # lazy print all bots only every 6 gens
+            if gen_i % 6 == 0:
+                for c, s, f, wr, tr in gen_results:
+                    print(f"    Bot #{c.combo_id:>3}: F1={f:.4f} WR={wr:.2%} trades={tr} score={s:.4f}")
             results_summary.append((gen_name, top2_score, top2[0].combo_id, top2[1].combo_id))
 
             # create next gen children from top 2
@@ -391,42 +414,30 @@ class TournamentBot:
                 new_pop.append(child)
             pop = new_pop
 
-        # final: train best bot on all years & save
+        # final: train best bot on all data & save
         print(f"\n{'='*60}")
-        print("  FINAL: training best bot on 2016-2024")
-        gold = self._prepare_data(year_filter=(2016, 2024))
+        print(f"  FINAL: training best bot on all {n_months} months")
+        gold = self._prepare_data()
         X_all = gold[self.feature_list]
         y_all = gold["Target"]
         best_combo = pop[0]
         model = XGBClassifier(
-            n_estimators=best_combo.xgb.n_estimators,
-            max_depth=best_combo.xgb.max_depth,
-            learning_rate=best_combo.xgb.learning_rate,
-            subsample=best_combo.xgb.subsample,
-            colsample_bytree=best_combo.xgb.colsample_bytree,
-            min_child_weight=best_combo.xgb.min_child_weight,
-            gamma=best_combo.xgb.gamma,
-            scale_pos_weight=best_combo.xgb.scale_pos_weight,
-            random_state=42, n_jobs=-1,
+            n_estimators=50, max_depth=6, learning_rate=0.05,
+            random_state=42, n_jobs=1,
         )
         model.fit(X_all, y_all, verbose=False)
         self.ai.model = model
         self.ai.save()
-        print(f"  Model saved. combo_id={best_combo.combo_id}, n_est={best_combo.xgb.n_estimators}, depth={best_combo.xgb.max_depth}, lr={best_combo.xgb.learning_rate}")
+        print(f"  Model saved. Final combo_id={best_combo.combo_id}")
 
-        # update best_params.json
         from core.evolutionary.persistence import save_best_params
         from core.evolutionary.fitness import FitnessScore
-        final_combo = best_combo
         best_score = max((r[1] for r in results_summary), default=0)
-        final_fitness = FitnessScore(composite_score=best_score, total_profit=best_score * 10)
-        save_best_params([(final_combo, final_fitness)], "best_params.json")
-        print(f"  best_params.json updated (score={best_score:.4f})")
+        save_best_params([(best_combo, FitnessScore(composite_score=best_score, total_profit=best_score*10))], "best_params.json")
+        print(f"  best_params.json updated")
 
         print(f"\n{'='*60}")
-        print("  WALKFORWARD EVOLUTION SUMMARY")
-        for gen_name, score, c1, c2 in results_summary:
-            print(f"  {gen_name}: score={score:.4f}, top2={c1},{c2}")
+        print(f"  DONE: {len(results_summary)} generations, best score={best_score:.4f}")
         print(f"{'='*60}")
 
     def _init_healing(self):
