@@ -2,6 +2,7 @@ import sys
 import os
 import time
 import signal
+import concurrent.futures
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -113,13 +114,19 @@ class TournamentBot:
             pass
 
     def _prepare_live_data(self, symbol="XAUUSD"):
-        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. Parquet-д хэзээ ч ханддаггүй."""
+        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. Timeout-той."""
         if not self.executor.connected:
             logging.warning("MT5 not connected, using cached data")
             return self._cached_data
         sym = self.executor._resolve_symbol(symbol)
+        rates = None
         try:
-            rates = self.executor.mt5.copy_rates_from_pos(sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(self.executor.mt5.copy_rates_from_pos, sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
+                rates = fut.result(timeout=30)
+        except concurrent.futures.TimeoutError:
+            logging.error("MT5 copy_rates_from_pos TIMEOUT after 30s, using cached data")
+            return self._cached_data
         except Exception as e:
             logging.error("MT5 copy_rates_from_pos failed: %s, using cached data", e)
             return self._cached_data
