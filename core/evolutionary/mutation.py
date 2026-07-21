@@ -103,6 +103,47 @@ def mutate_combo(combo: ParameterCombo, combo_id: int) -> ParameterCombo:
     return ParameterCombo(xgb=new_xgb, trading=new_trading, combo_id=combo_id)
 
 
+def crossover_combos(parent_a: ParameterCombo, parent_b: ParameterCombo, combo_id: int) -> ParameterCombo:
+    """Uniform crossover between two parents."""
+    xgb_fields = {
+        "n_estimators": int,
+        "max_depth": int,
+        "learning_rate": float,
+        "subsample": float,
+        "colsample_bytree": float,
+        "min_child_weight": int,
+        "gamma": float,
+        "scale_pos_weight": int,
+    }
+    trading_fields = {
+        "stop_loss_pct": float,
+        "take_profit_pct": float,
+        "spread_bps": float,
+        "commission": float,
+        "slippage_bps": float,
+        "buy_threshold": float,
+        "sell_threshold": float,
+    }
+
+    # XGBoost
+    xgb_kwargs = {}
+    for field, typ in xgb_fields.items():
+        a_val = getattr(parent_a.xgb, field)
+        b_val = getattr(parent_b.xgb, field)
+        xgb_kwargs[field] = typ(a_val if random.random() < 0.5 else b_val)
+    new_xgb = XGBoostConfig(**xgb_kwargs)
+
+    # Trading
+    trading_kwargs = {}
+    for field, typ in trading_fields.items():
+        a_val = getattr(parent_a.trading, field)
+        b_val = getattr(parent_b.trading, field)
+        trading_kwargs[field] = typ(a_val if random.random() < 0.5 else b_val)
+    new_trading = TradingConfig(**trading_kwargs)
+
+    return ParameterCombo(xgb=new_xgb, trading=new_trading, combo_id=combo_id)
+
+
 def evolve_population(
     ranked: List[Tuple[ParameterCombo, FitnessScore]],
     population_size: int,

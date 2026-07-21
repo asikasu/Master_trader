@@ -199,7 +199,16 @@ class TournamentBot:
         return df
 
     def run_train(self, n_rows=0):
-        print("=== TRAIN MODE (Yearly CV) ===")
+        print("=== TRAIN MODE (Yearly CV, 3 folds) ===")
+
+        # Override XGB config for training speed
+        class FastXGBConfig:
+            n_estimators = 50
+            max_depth = 6
+            learning_rate = 0.05
+        self.ai.xgb_config = FastXGBConfig()
+        self.ai.model = None  # force rebuild on first train
+
         cv_pairs = [
             (2016, 2017, 2018),
             (2019, 2020, 2021),
@@ -232,7 +241,7 @@ class TournamentBot:
                 print(f"  SKIP: insufficient data")
                 continue
 
-            self.ai.train(X_train_all, y_train_all, eval_set=[(X_test, y_test)], verbose=False)
+            self.ai.train(X_train_all, y_train_all, eval_set=[(X_test, y_test)], verbose=True)
 
             probs = self.ai.model.predict_proba(X_test)[:, 1]
             best_f1, best_thr = 0, 0.5
@@ -287,22 +296,125 @@ class TournamentBot:
         print(f"SIGNAL: {sig['signal']} | Prob={prob:.2%} {sl_str} {tp_str}{reason}")
 
     def run_evolve(self, generations=10, population=100, sample_size=5000, year_filter=None):
-        print("=== EVOLVE MODE ===")
-        engine = self.evo_trainer.run_evolution(
-            generations=generations,
-            population=population,
-            resume=True,
-            state_dir=str(Path(".").resolve()),
-            sample_size=sample_size,
-            year_filter=year_filter,
+        print("=== EVOLVE MODE (Walkforward Evolutionary CV) ===")
+        generators = [
+            (2016, 2017, 2018, "Gen1"),
+            (2019, 2020, 2021, "Gen2"),
+            (2022, 2023, 2024, "Gen3"),
+        ]
+        n_pop = 10
+        pop = []
+        results_summary = []
+
+        for gen_i, (train_start, train_end, test_year, gen_name) in enumerate(generators):
+            print(f"\n{'='*60}")
+            print(f"  GENERATION {gen_name}: train={train_start}-{train_end}, test={test_year}")
+            print(f"{'='*60}")
+
+            # data
+            gold = self._prepare_data(year_filter=(train_start, train_end))
+            X_train = gold[self.feature_list]
+            y_train = gold["Target"]
+            test_gold = self._prepare_data(year_filter=(test_year, test_year))
+            X_test = test_gold[self.feature_list]
+            y_test = test_gold["Target"]
+            print(f"  Train: {len(X_train)} rows, Test: {len(X_test)} rows")
+
+            # first gen: create 10 bot combos
+            if gen_i == 0:
+                from core.evolutionary.mutation import mutate_combo
+                from core.evolutionary.types import ParameterCombo, XGBoostConfig, TradingConfig
+                base = ParameterCombo(
+                    xgb=XGBoostConfig(n_estimators=50, max_depth=6, learning_rate=0.05),
+                    trading=TradingConfig(buy_threshold=0.72, sell_threshold=0.28, stop_loss_pct=0.005, take_profit_pct=0.011),
+                    combo_id=0,
+                )
+                pop = [mutate_combo(base, i) for i in range(1, n_pop + 1)]
+
+            # train & evaluate each bot
+            gen_results = []
+            for idx, combo in enumerate(pop):
+                model = XGBClassifier(
+                    n_estimators=combo.xgb.n_estimators,
+                    max_depth=combo.xgb.max_depth,
+                    learning_rate=combo.xgb.learning_rate,
+                    subsample=combo.xgb.subsample,
+                    colsample_bytree=combo.xgb.colsample_bytree,
+                    min_child_weight=combo.xgb.min_child_weight,
+                    gamma=combo.xgb.gamma,
+                    scale_pos_weight=combo.xgb.scale_pos_weight,
+                    random_state=42, n_jobs=-1,
+                )
+                model.fit(X_train, y_train, verbose=False)
+                probs = model.predict_proba(X_test)[:, 1]
+
+                # eval: F1 at thr=0.50
+                pred = (probs > 0.50).astype(int)
+                f1 = f1_score(y_test, pred, zero_division=0)
+                acc = accuracy_score(y_test, pred)
+
+                wins = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==1)
+                losses = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==0)
+                trades = wins + losses
+                wr = wins/trades if trades>0 else 0
+
+                score = f1 * 0.5 + wr * 0.3 + (acc-0.5) * 0.2
+                gen_results.append((combo, score, f1, wr, trades))
+                print(f"  Bot #{combo.combo_id:>3}: F1={f1:.4f}  WR={wr:.2%}  trades={trades}  score={score:.4f}")
+
+            # rank & keep top 2
+            gen_results.sort(key=lambda x: x[1], reverse=True)
+            top2 = [r[0] for r in gen_results[:2]]
+            top2_score = gen_results[0][1]
+            print(f"\n  >> Top 2 bots: #{top2[0].combo_id} (score={top2_score:.4f}), #{top2[1].combo_id}")
+            results_summary.append((gen_name, top2_score, top2[0].combo_id, top2[1].combo_id))
+
+            # create next gen children from top 2
+            from core.evolutionary.mutation import crossover_combos, mutate_combo
+            next_id = max((c.combo_id for c in pop), default=0) + 1
+            new_pop = list(top2)
+            for i in range(2, n_pop):
+                child = crossover_combos(top2[0], top2[1], next_id + i)
+                child = mutate_combo(child, next_id + i)
+                new_pop.append(child)
+            pop = new_pop
+
+        # final: train best bot on all years & save
+        print(f"\n{'='*60}")
+        print("  FINAL: training best bot on 2016-2024")
+        gold = self._prepare_data(year_filter=(2016, 2024))
+        X_all = gold[self.feature_list]
+        y_all = gold["Target"]
+        best_combo = pop[0]
+        model = XGBClassifier(
+            n_estimators=best_combo.xgb.n_estimators,
+            max_depth=best_combo.xgb.max_depth,
+            learning_rate=best_combo.xgb.learning_rate,
+            subsample=best_combo.xgb.subsample,
+            colsample_bytree=best_combo.xgb.colsample_bytree,
+            min_child_weight=best_combo.xgb.min_child_weight,
+            gamma=best_combo.xgb.gamma,
+            scale_pos_weight=best_combo.xgb.scale_pos_weight,
+            random_state=42, n_jobs=-1,
         )
-        state = engine.state
-        if state and state.best_fitness:
-            print(f"\nEvolution complete: {state.generation} generations")
-            print(f"  Composite Score: {state.best_fitness.composite_score:.4f}")
-            print(f"  Sharpe Ratio:    {state.best_fitness.sharpe_ratio:.4f}")
-            print(f"  Total Profit:    {state.best_fitness.total_profit:.2f}")
-            print(f"  Max Drawdown:    {state.best_fitness.max_drawdown_pct:.2f}%")
+        model.fit(X_all, y_all, verbose=False)
+        self.ai.model = model
+        self.ai.save()
+        print(f"  Model saved. combo_id={best_combo.combo_id}, n_est={best_combo.xgb.n_estimators}, depth={best_combo.xgb.max_depth}, lr={best_combo.xgb.learning_rate}")
+
+        # update best_params.json
+        from core.evolutionary.persistence import save_best_params
+        from core.evolutionary.types import ParameterCombo, XGBoostConfig, TradingConfig
+        from core.evolutionary.fitness import FitnessScore
+        final_combo = best_combo
+        final_fitness = FitnessScore(composite_score=max(r[1] for _,r in [(None,0)] + [(None, r[1]) for r in gen_results] if 0))
+        save_best_params([(final_combo, final_fitness)], "best_params.json")
+
+        print(f"\n{'='*60}")
+        print("  WALKFORWARD EVOLUTION SUMMARY")
+        for gen_name, score, c1, c2 in results_summary:
+            print(f"  {gen_name}: score={score:.4f}, top2={c1},{c2}")
+        print(f"{'='*60}")
 
     def _init_healing(self):
         gold = self._prepare_data()
