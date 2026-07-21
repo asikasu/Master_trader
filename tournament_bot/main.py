@@ -178,15 +178,19 @@ class TournamentBot:
             logging.error("_prepare_live_data failed: %s", e, exc_info=True)
             return None
 
-    def _prepare_data(self, df=None, n_rows=500):
+    def _prepare_data(self, df=None, n_rows=0, year_filter=None):
         if df is None:
             df = self.loader.load_gold_data(n_rows=n_rows)
         raw_count = len(df)
         df = self.features.add_features(df)
+        if year_filter is not None:
+            start_y, end_y = year_filter
+            mask = (df["DATETIME"].dt.year >= start_y) & (df["DATETIME"].dt.year <= end_y)
+            df = df[mask].copy()
         future_move = df["CLOSE"].shift(-4) - df["CLOSE"]
         df["Target"] = (future_move > df["ATR14"] * 0.3).astype(int)
         df = df.iloc[:-4].dropna(subset=["Target", "CLOSE"]).copy()
-        logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
+        logging.info("Data: raw=%d, features=%d, trainable=%d year=%s", raw_count, raw_count, len(df), year_filter)
         if len(df) > 0:
             logging.debug("Last row features: EMA20=%.2f EMA50=%.2f ATR14=%.4f SPREAD=%.2f CLOSE=%.2f",
                           df["EMA20"].iloc[-1], df["EMA50"].iloc[-1], df["ATR14"].iloc[-1],
@@ -194,56 +198,82 @@ class TournamentBot:
                           df["CLOSE"].iloc[-1])
         return df
 
-    def run_train(self, n_rows=500):
-        print("=== TRAIN MODE ===")
-        gold = self._prepare_data(n_rows=n_rows)
-        X = gold[self.feature_list]
-        y = gold["Target"]
-        print(f"Train rows: {len(X)}  (0: {sum(y==0)}, 1: {sum(y==1)})")
+    def run_train(self, n_rows=0):
+        print("=== TRAIN MODE (Yearly CV) ===")
+        cv_pairs = [
+            (2016, 2017, 2018),
+            (2019, 2020, 2021),
+            (2022, 2023, 2024),
+        ]
+        print(f"Folds: {cv_pairs}")
+        print()
 
-        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.20, shuffle=False)
-        print(f"Train: {len(X_train)}, Test: {len(X_test)}")
+        best_overall_f1 = 0
+        best_overall_threshold = 0.5
+        fold_results = []
 
-        self.ai.train(X_train, y_train, eval_set=[(X_test, y_test)], verbose=True)
-        train_acc = accuracy_score(y_train, self.ai.model.predict(X_train))
-        print(f"Train Accuracy: {train_acc:.2%}")
+        for train_start, train_end, test_year in cv_pairs:
+            train_years = (train_start, train_end)
+            print(f"\n{'='*60}")
+            print(f"FOLD: Train={train_years}  Test={test_year}")
+            print(f"{'='*60}")
 
-        probs = self.ai.model.predict_proba(X_test)[:, 1]
-        best_score, best_threshold = 0, 0.5
-        print("\nTHRESHOLD SEARCH:")
-        for t in [0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70]:
-            p = (probs > t).astype(int)
-            f1 = f1_score(y_test, p, zero_division=0)
-            acc = accuracy_score(y_test, p)
-            print(f"  T={t:.2f} ACC={acc:.4f} F1={f1:.4f}")
-            if f1 > best_score:
-                best_score, best_threshold = f1, t
-        print(f"Best: threshold={best_threshold}, F1={best_score:.4f}")
+            gold = self._prepare_data(year_filter=train_years)
+            X_train_all = gold[self.feature_list]
+            y_train_all = gold["Target"]
+            print(f"  Train: {len(X_train_all)} rows  (0: {sum(y_train_all==0)}, 1: {sum(y_train_all==1)})")
 
-        pred = (probs > best_threshold).astype(int)
-        wins = sum(1 for i in range(len(pred)) if pred[i] == 1 and y_test.iloc[i] == 1)
-        losses = sum(1 for i in range(len(pred)) if pred[i] == 1 and y_test.iloc[i] == 0)
-        total = wins + losses
-        if total > 0:
-            win_rate = wins / total
-            print(f"\nTrading Stats: Trades={total}, WinRate={win_rate:.2%}")
+            test_df = self._prepare_data(year_filter=(test_year, test_year))
+            X_test = test_df[self.feature_list]
+            y_test = test_df["Target"]
+            print(f"  Test:  {len(X_test)} rows  (0: {sum(y_test==0)}, 1: {sum(y_test==1)})")
 
-        cm = confusion_matrix(y_test, pred)
-        print(f"\nConfusion Matrix:\n{cm}")
-        print(f"\n{classification_report(y_test, pred, zero_division=0)}")
+            if len(X_train_all) < 100 or len(X_test) < 10:
+                print(f"  SKIP: insufficient data")
+                continue
 
-        imp = self.ai.model.feature_importances_
-        print("\nFEATURE IMPORTANCE (top 10):")
-        for name, val in sorted(zip(self.feature_list, imp), key=lambda x: x[1], reverse=True)[:10]:
-            print(f"  {name:20} {val:.4f}")
+            self.ai.train(X_train_all, y_train_all, eval_set=[(X_test, y_test)], verbose=False)
 
-        if best_score > self.best_f1:
-            self.best_f1 = best_score
-            self.ai.save()
-            print("[SAVE] New best model")
+            probs = self.ai.model.predict_proba(X_test)[:, 1]
+            best_f1, best_thr = 0, 0.5
+            for t in [0.30, 0.35, 0.40, 0.45, 0.50, 0.55, 0.60, 0.65, 0.70]:
+                p = (probs > t).astype(int)
+                f1 = f1_score(y_test, p, zero_division=0)
+                if f1 > best_f1:
+                    best_f1, best_thr = f1, t
+            print(f"  Best F1={best_f1:.4f} @ thr={best_thr:.2f}")
 
-        prob = self.ai.predict_probability(X.iloc[-1:])
-        print(f"\nProbability: {prob:.2%}")
+            pred = (probs > best_thr).astype(int)
+            wins = sum(1 for i in range(len(pred)) if pred[i] == 1 and y_test.iloc[i] == 1)
+            losses = sum(1 for i in range(len(pred)) if pred[i] == 1 and y_test.iloc[i] == 0)
+            total_trades = wins + losses
+            win_rate = wins / total_trades if total_trades > 0 else 0
+            cm = confusion_matrix(y_test, pred)
+
+            fold_results.append({
+                "test_year": test_year,
+                "train_years": train_years,
+                "f1": best_f1,
+                "threshold": best_thr,
+                "win_rate": win_rate,
+                "trades": total_trades,
+                "confusion": cm.tolist(),
+            })
+
+            if best_f1 > best_overall_f1:
+                best_overall_f1 = best_f1
+                best_overall_threshold = best_thr
+                self.ai.save()
+                print(f"  [SAVE] New best model (F1={best_f1:.4f})")
+
+        print(f"\n{'='*60}")
+        print("YEARLY CV SUMMARY")
+        print(f"{'='*60}")
+        print(f"{'Train':>10} {'Test':>5} {'F1':>6} {'Thr':>5} {'WinRate':>8} {'Trades':>6}")
+        for r in fold_results:
+            train_str = f"{r['train_years'][0]}-{r['train_years'][1]}"
+            print(f"{train_str:>10} {r['test_year']:>5} {r['f1']:>6.4f} {r['threshold']:>5.2f} {r['win_rate']:>7.2%} {r['trades']:>6}")
+        print(f"\nBest overall: F1={best_overall_f1:.4f} @ threshold={best_overall_threshold:.2f}")
 
         now = datetime.now()
         news_warning = f" (NEXT: {self.news_filter.next_news(now)})" if self.news_filter.is_news_event(now) else ""
@@ -256,7 +286,7 @@ class TournamentBot:
         reason = f" | {sig['reason']}" if sig['reason'] else ""
         print(f"SIGNAL: {sig['signal']} | Prob={prob:.2%} {sl_str} {tp_str}{reason}")
 
-    def run_evolve(self, generations=10, population=100, sample_size=5000):
+    def run_evolve(self, generations=10, population=100, sample_size=5000, year_filter=None):
         print("=== EVOLVE MODE ===")
         engine = self.evo_trainer.run_evolution(
             generations=generations,
@@ -264,6 +294,7 @@ class TournamentBot:
             resume=True,
             state_dir=str(Path(".").resolve()),
             sample_size=sample_size,
+            year_filter=year_filter,
         )
         state = engine.state
         if state and state.best_fitness:
@@ -577,7 +608,7 @@ if __name__ == "__main__":
         if args.mode in ("TRAIN", "BOTH"):
             bot.run_train(n_rows=args.sample)
         if args.mode in ("EVOLVE", "BOTH"):
-            bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample)
+            bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample, year_filter=(2016, 2023))
         if args.mode == "LIVE":
             while True:
                 try:

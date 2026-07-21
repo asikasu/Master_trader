@@ -1,0 +1,198 @@
+2026-07-21 14:43:46,907 [INFO] Loaded 10 best combos from best_params.json
+2026-07-21 14:43:46,907 [INFO] Loaded best params: combo_id=384 n_est=334 depth=3 lr=0.016 buy_thr=0.72 sl=0.001 tp=0.008
+2026-07-21 14:43:46,912 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:43:47,086 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:43:47,087 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:43:47,087 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:44:02,087 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:02,088 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:02,091 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:44:02,091 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:44:02,091 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:44:17,092 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:17,092 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:17,097 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:44:17,097 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:44:17,097 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:44:32,098 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:32,099 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:32,106 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:44:32,106 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:44:32,106 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:44:47,107 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:47,107 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:44:47,109 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:44:47,110 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:44:47,110 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:45:02,110 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:02,111 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:02,116 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:45:02,117 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:45:02,117 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:45:17,118 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:17,118 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:17,123 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:45:17,123 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:45:17,123 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:45:32,124 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:32,125 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:32,134 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:45:32,134 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:45:32,134 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:45:47,135 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:47,135 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:45:47,137 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:45:47,138 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:45:47,138 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:46:02,139 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:02,140 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:02,144 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:46:02,144 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:46:02,144 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:46:17,144 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:17,145 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:17,149 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:46:17,150 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:46:17,150 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:46:32,151 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:32,151 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:32,157 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:46:32,157 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:46:32,157 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:46:47,158 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:47,158 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:46:47,164 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:46:47,164 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:46:47,165 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:47:02,165 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:02,166 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:02,170 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:47:02,171 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:47:02,171 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:47:17,172 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:17,173 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:17,182 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:47:17,183 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:47:17,183 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:47:32,184 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:32,185 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:32,191 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:47:32,191 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:47:32,191 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:47:47,192 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:47,193 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:47:47,198 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:47:47,198 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:47:47,198 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:48:02,198 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:02,199 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:02,201 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:48:02,201 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:48:02,201 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:48:17,202 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:17,202 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:17,208 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:48:17,209 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:48:17,209 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:48:32,215 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:32,216 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:32,218 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:48:32,219 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:48:32,219 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:48:47,219 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:47,220 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:48:47,224 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:48:47,224 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:48:47,224 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:49:02,226 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:02,226 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:02,228 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:49:02,228 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:49:02,228 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:49:17,229 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:17,229 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:17,232 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:49:17,232 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:49:17,232 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:49:32,233 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:32,233 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:32,236 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:49:32,236 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:49:32,236 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:49:47,237 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:47,237 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:49:47,249 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:49:47,250 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:49:47,250 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:50:02,251 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:02,251 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:02,253 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:50:02,254 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:50:02,254 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:50:17,254 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:17,255 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:17,258 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:50:17,258 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:50:17,258 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:50:32,259 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:32,259 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:32,262 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:50:32,262 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:50:32,263 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:50:47,263 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:47,264 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:50:47,269 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:50:47,269 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:50:47,269 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:51:02,270 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:02,270 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:02,275 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:51:02,276 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:51:02,276 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:51:17,278 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:17,278 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:17,289 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:51:17,289 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:51:17,289 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:51:32,290 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:32,290 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:32,294 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:51:32,294 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:51:32,294 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:51:47,295 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:47,296 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:51:47,301 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:51:47,301 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:51:47,302 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:52:02,303 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:02,304 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:02,314 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:52:02,314 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:52:02,315 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:52:17,315 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:17,316 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:17,320 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:52:17,320 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:52:17,320 [INFO] Reinitializing executor and retrying in 15s...
+2026-07-21 14:52:32,321 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:32,321 [ERROR] MT5 init failed: (-10003, 'IPC initialize failed, MetaTrader 5 x64 not found')
+2026-07-21 14:52:32,328 [WARNING] MT5 not connected, using cached data
+2026-07-21 14:52:32,328 [CRITICAL] LIVE error: 'NoneType' object is not subscriptable
+2026-07-21 14:52:32,328 [INFO] Reinitializing executor and retrying in 15s...
+Traceback (most recent call last):
+  File "C:\Users\Mintug PC\Documents\Master_trader\tournament_bot\main.py", line 584, in <module>
+    bot.run_live(symbol=args.symbol)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mintug PC\Documents\Master_trader\tournament_bot\main.py", line 378, in run_live
+    X = gold[self.feature_list]
+        ~~~~^^^^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\Mintug PC\Documents\Master_trader\tournament_bot\main.py", line 598, in <module>
+    time.sleep(15)
+    ~~~~~~~~~~^^^^
+KeyboardInterrupt
+^C

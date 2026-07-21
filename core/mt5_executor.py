@@ -1,3 +1,4 @@
+import os
 import time
 import logging
 from datetime import datetime
@@ -24,7 +25,11 @@ class MT5Executor:
         try:
             import MetaTrader5 as mt5
             self.mt5 = mt5
-            self.connected = mt5.initialize()
+            mt5_path = "C:\\Program Files\\MetaTrader 5\\terminal64.exe"
+            if os.path.exists(mt5_path):
+                self.connected = mt5.initialize(path=mt5_path)
+            else:
+                self.connected = mt5.initialize()
             if self.connected:
                 logger.info("MT5 initialized")
                 info = mt5.terminal_info()

@@ -38,8 +38,8 @@ class EvolutionaryTrainer:
         self.features = FeatureEngine()
         self._cached_data: pd.DataFrame = None
 
-    def prepare_data(self, sample_size: int = 0) -> pd.DataFrame:
-        if self._cached_data is not None:
+    def prepare_data(self, sample_size: int = 0, year_filter=None) -> pd.DataFrame:
+        if self._cached_data is not None and year_filter is None:
             data = self._cached_data
             if sample_size > 0 and sample_size < len(data):
                 data = data.iloc[:sample_size].copy()
@@ -47,19 +47,24 @@ class EvolutionaryTrainer:
 
         df = self.loader.load_gold_data()
         df = self.features.add_features(df)
+        if year_filter is not None:
+            start_y, end_y = year_filter
+            mask = (df["DATETIME"].dt.year >= start_y) & (df["DATETIME"].dt.year <= end_y)
+            df = df[mask].copy()
 
         future_move = df["CLOSE"].shift(-4) - df["CLOSE"]
         df["Target"] = (future_move > df["ATR14"] * 0.3).astype(int)
         df = df.iloc[:-4].dropna(subset=["Target", "CLOSE"]).copy()
 
-        self._cached_data = df
-        logger.info("Prepared data: %d rows, %d features", len(df), len(FEATURE_COLUMNS))
+        if year_filter is None:
+            self._cached_data = df
+        logger.info("Prepared data: %d rows (year=%s)", len(df), year_filter)
         return df
 
     def run_evolution(self, generations: int = 10, population: int = 100,
                       resume: bool = True, state_dir: str = ".",
-                      sample_size: int = 5000) -> EvolutionaryEngine:
-        data = self.prepare_data(sample_size=sample_size)
+                      sample_size: int = 5000, year_filter=None) -> EvolutionaryEngine:
+        data = self.prepare_data(sample_size=sample_size, year_filter=year_filter)
         if sample_size > 0 and sample_size < len(data):
             logger.info("Sampling first %d rows for evolution (total: %d)", sample_size, len(data))
             data = data.iloc[:sample_size].copy()
