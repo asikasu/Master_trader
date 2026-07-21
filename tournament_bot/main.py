@@ -17,6 +17,7 @@ import numpy as np
 from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, confusion_matrix, classification_report, f1_score
+from xgboost import XGBClassifier
 
 from core.data_loader import DataLoader
 from core.feature_engine import FeatureEngine
