@@ -290,6 +290,8 @@ class TournamentBot:
         print(f"News Filter: {'BLOCKED' if self.news_filter.is_news_event(now) else 'OK'}{news_warning}")
 
         last_row = gold.iloc[-1]
+        last_row_features = last_row[self.feature_list].values.reshape(1, -1)
+        prob = self.ai.model.predict_proba(last_row_features)[0, 1]
         sig = self.rules.validate_signal(last_row, prob, gold)
         sl_str = f"SL={sig['sl']:.2f}" if sig['sl'] else ""
         tp_str = f"TP={sig['tp']:.2f}" if sig['tp'] else ""
@@ -326,7 +328,7 @@ class TournamentBot:
                 from core.evolutionary.mutation import mutate_combo
                 from core.evolutionary.types import ParameterCombo, XGBoostConfig, TradingConfig
                 base = ParameterCombo(
-                    xgb=XGBoostConfig(n_estimators=50, max_depth=6, learning_rate=0.05),
+                    xgb=XGBoostConfig(n_estimators=50, max_depth=4, learning_rate=0.05),
                     trading=TradingConfig(buy_threshold=0.72, sell_threshold=0.28, stop_loss_pct=0.005, take_profit_pct=0.011),
                     combo_id=0,
                 )
@@ -336,17 +338,18 @@ class TournamentBot:
             gen_results = []
             for idx, combo in enumerate(pop):
                 try:
-                    est = min(combo.xgb.n_estimators, 100)
+                    est = min(combo.xgb.n_estimators, 50)
+                    depth = min(combo.xgb.max_depth, 6)
                     model = XGBClassifier(
                         n_estimators=est,
-                        max_depth=combo.xgb.max_depth,
+                        max_depth=depth,
                         learning_rate=combo.xgb.learning_rate,
                         subsample=combo.xgb.subsample,
                         colsample_bytree=combo.xgb.colsample_bytree,
                         min_child_weight=combo.xgb.min_child_weight,
                         gamma=combo.xgb.gamma,
                         scale_pos_weight=combo.xgb.scale_pos_weight,
-                        random_state=42, n_jobs=-1,
+                        random_state=42, n_jobs=1,
                     )
                     model.fit(X_train, y_train, verbose=False)
                     probs = model.predict_proba(X_test)[:, 1]
