@@ -154,16 +154,17 @@ class TournamentBot:
             dt = df["DATETIME"]
             df["DATE"] = dt.dt.strftime("%Y.%m.%d")
             df["TIME"] = dt.dt.strftime("%H:%M:%S")
+            df.sort_values("DATETIME", inplace=True)
             if h1 is not None:
-                df["H1_OPEN"] = h1["OPEN"].reindex_like(df, method="ffill")
-                df["H1_CLOSE"] = h1["CLOSE"].reindex_like(df, method="ffill")
-                df["H1_HIGH"] = h1["HIGH"].reindex_like(df, method="ffill")
-                df["H1_LOW"] = h1["LOW"].reindex_like(df, method="ffill")
+                h1_s = h1[["DATETIME", "OPEN", "HIGH", "LOW", "CLOSE"]].copy()
+                h1_s.rename(columns={"OPEN": "H1_OPEN", "HIGH": "H1_HIGH", "LOW": "H1_LOW", "CLOSE": "H1_CLOSE"}, inplace=True)
+                h1_s.sort_values("DATETIME", inplace=True)
+                df = pd.merge_asof(df, h1_s, on="DATETIME", direction="backward")
             if h4 is not None:
-                df["H4_OPEN"] = h4["OPEN"].reindex_like(df, method="ffill")
-                df["H4_CLOSE"] = h4["CLOSE"].reindex_like(df, method="ffill")
-                df["H4_HIGH"] = h4["HIGH"].reindex_like(df, method="ffill")
-                df["H4_LOW"] = h4["LOW"].reindex_like(df, method="ffill")
+                h4_s = h4[["DATETIME", "OPEN", "HIGH", "LOW", "CLOSE"]].copy()
+                h4_s.rename(columns={"OPEN": "H4_OPEN", "HIGH": "H4_HIGH", "LOW": "H4_LOW", "CLOSE": "H4_CLOSE"}, inplace=True)
+                h4_s.sort_values("DATETIME", inplace=True)
+                df = pd.merge_asof(df, h4_s, on="DATETIME", direction="backward")
             tick = self.executor.mt5.symbol_info_tick(sym)
             last_spread = (tick.ask - tick.bid) / tick.bid * 10000 if tick and tick.bid > 0 else 1.0
             df["SPREAD"] = last_spread
