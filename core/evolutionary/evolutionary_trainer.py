@@ -48,9 +48,9 @@ class EvolutionaryTrainer:
         df = self.loader.load_gold_data()
         df = self.features.add_features(df)
 
-        future_move = df["CLOSE"].shift(-60) - df["CLOSE"]
-        df["Target"] = (future_move > df["ATR14"] * 0.5).astype(int)
-        df = df.iloc[:-60].dropna(subset=["Target", "CLOSE"]).copy()
+        future_move = df["CLOSE"].shift(-4) - df["CLOSE"]
+        df["Target"] = (future_move > df["ATR14"] * 0.3).astype(int)
+        df = df.iloc[:-4].dropna(subset=["Target", "CLOSE"]).copy()
 
         self._cached_data = df
         logger.info("Prepared data: %d rows, %d features", len(df), len(FEATURE_COLUMNS))
