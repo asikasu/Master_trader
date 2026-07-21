@@ -341,18 +341,17 @@ class TournamentBot:
     def _reconnect_mt5(self):
         if self.executor.connected:
             return True
-        logging.warning("MT5 disconnected. Checking terminal status...")
-        for attempt in range(3):
+        logging.warning("MT5 not connected. Attempting reconnect...")
+        for attempt in range(5):
             try:
-                info = self.executor.mt5.terminal_info()
-                if info is not None:
-                    self.executor.connected = True
+                ok = self.executor.initialize()
+                if ok:
+                    logging.info("MT5 reconnected")
                     return True
-            except Exception:
-                pass
-            logging.info("MT5 reconnect attempt %d...", attempt + 1)
-            self.executor.initialize()
-            time.sleep(2)
+            except Exception as ex:
+                logging.warning("Reconnect attempt %d failed: %s", attempt + 1, ex)
+            time.sleep(3)
+        logging.error("MT5 reconnect failed after 5 attempts")
         return False
 
     def run_live(self, symbol="XAUUSD"):
@@ -419,7 +418,11 @@ class TournamentBot:
                     continue
 
                 gold = self._prepare_live_data()
-                logging.info("[CYCLE] data_ready rows=%d", len(gold) if gold is not None else 0)
+                if gold is None or len(gold) == 0:
+                    logging.warning("[CYCLE] No data available, waiting 15s...")
+                    time.sleep(15)
+                    continue
+                logging.info("[CYCLE] data_ready rows=%d", len(gold))
                 X = gold[self.feature_list]
                 last_row = gold.iloc[-1]
                 current_atr = last_row.get("ATR14", 10.0)
@@ -453,11 +456,11 @@ class TournamentBot:
                         entry_sl = entry_tp = None
                     elif result == "HOLDING":
                         print(f"[POS] Price={price:.2f} PnL={real_pnl:.2f} Bal={balance:.2f}")
-                    time.sleep(self.scan_interval)
+                    time.sleep(5)
                     continue
 
                 if not self.executor.can_trade(symbol):
-                    time.sleep(60)
+                    time.sleep(30)
                     continue
 
                 if now - last_train_time > timedelta(days=7):
@@ -568,17 +571,20 @@ if __name__ == "__main__":
                 try:
                     bot.run_live(symbol=args.symbol)
                     break
-                except (ConnectionError, TimeoutError, OSError) as e:
-                    logging.error("LIVE connection error, restarting in 10s: %s", e)
-                    time.sleep(10)
                 except SystemExit as e:
                     if e.code == 0:
                         break
-                    logging.error("LIVE crashed (code=%s), restarting in 5s", e.code)
+                    logging.error("LIVE crash code=%s, restarting in 5s", e.code)
                     time.sleep(5)
                 except Exception as e:
-                    logging.critical("LIVE unexpected error: %s", e, exc_info=True)
-                    time.sleep(30)
+                    logging.critical("LIVE error: %s", e)
+                    logging.info("Reinitializing executor and retrying in 15s...")
+                    try:
+                        bot.executor.shutdown()
+                    except Exception:
+                        pass
+                    time.sleep(15)
+                    bot.executor.initialize()
     except Exception as e:
         import traceback
         print(f"!!! CRITICAL ERROR: {e}")
