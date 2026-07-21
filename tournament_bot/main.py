@@ -335,8 +335,9 @@ class TournamentBot:
             # train & evaluate each bot
             gen_results = []
             for idx, combo in enumerate(pop):
+                est = min(combo.xgb.n_estimators, 100)
                 model = XGBClassifier(
-                    n_estimators=combo.xgb.n_estimators,
+                    n_estimators=est,
                     max_depth=combo.xgb.max_depth,
                     learning_rate=combo.xgb.learning_rate,
                     subsample=combo.xgb.subsample,
@@ -405,11 +406,12 @@ class TournamentBot:
 
         # update best_params.json
         from core.evolutionary.persistence import save_best_params
-        from core.evolutionary.types import ParameterCombo, XGBoostConfig, TradingConfig
         from core.evolutionary.fitness import FitnessScore
         final_combo = best_combo
-        final_fitness = FitnessScore(composite_score=max(r[1] for _,r in [(None,0)] + [(None, r[1]) for r in gen_results] if 0))
+        best_score = max((r[1] for r in results_summary), default=0)
+        final_fitness = FitnessScore(composite_score=best_score, total_profit=best_score * 10)
         save_best_params([(final_combo, final_fitness)], "best_params.json")
+        print(f"  best_params.json updated (score={best_score:.4f})")
 
         print(f"\n{'='*60}")
         print("  WALKFORWARD EVOLUTION SUMMARY")
