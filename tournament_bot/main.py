@@ -361,6 +361,7 @@ class TournamentBot:
         while True:
             try:
                 now = datetime.now()
+                logging.info("[CYCLE] start")
 
                 if self.news_filter.is_news_event(now):
                     print("[NEWS] Medeenii uyed arijaag zasvarlaj baina.")
@@ -368,6 +369,7 @@ class TournamentBot:
                     continue
 
                 gold = self._prepare_live_data()
+                logging.info("[CYCLE] data_ready rows=%d", len(gold) if gold is not None else 0)
                 X = gold[self.feature_list]
                 last_row = gold.iloc[-1]
                 current_atr = last_row.get("ATR14", 10.0)
@@ -463,9 +465,9 @@ class TournamentBot:
                         logging.info("Lot too small: %.3f (prob=%.3f, balance=%.2f, sl_pts=%.1f)",
                                      lot, prob, balance, sl_points)
 
-                logging.info("[BEAT] prob=%.3f signal=%s spread=%.1f next_check=%ds",
-                             prob, sig["signal"], last_row.get("SPREAD",0), self.scan_interval)
+                logging.info("[CYCLE] end prob=%.3f signal=%s", prob, sig["signal"])
                 time.sleep(self.scan_interval)
+                logging.info("[CYCLE] wake")
 
             except (ConnectionError, TimeoutError, ValueError, OSError) as e:
                 logging.error("[BEAT] Recoverable error: %s - retrying in 30s", e)
