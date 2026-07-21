@@ -314,14 +314,16 @@ class TournamentBot:
             print(f"  GENERATION {gen_name}: train={train_start}-{train_end}, test={test_year}")
             print(f"{'='*60}")
 
-            # data
+            # data - sample to 50000 for speed
             gold = self._prepare_data(year_filter=(train_start, train_end))
+            gold = gold.sample(n=min(50000, len(gold)), random_state=42)
             X_train = gold[self.feature_list]
             y_train = gold["Target"]
             test_gold = self._prepare_data(year_filter=(test_year, test_year))
+            test_gold = test_gold.sample(n=min(25000, len(test_gold)), random_state=42)
             X_test = test_gold[self.feature_list]
             y_test = test_gold["Target"]
-            print(f"  Train: {len(X_train)} rows, Test: {len(X_test)} rows")
+            print(f"  Train: {len(X_train)} rows (sampled), Test: {len(X_test)} rows (sampled)")
 
             # first gen: create 10 bot combos
             if gen_i == 0:
