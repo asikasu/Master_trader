@@ -113,37 +113,62 @@ class TournamentBot:
         except Exception:
             pass
 
+    def _fetch_mtf_rates(self, sym, tf, label):
+        """Нэг timeframe-аас 500 мөр татах, timeout 30s."""
+        if not self.executor.connected:
+            return None
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+                fut = ex.submit(self.executor.mt5.copy_rates_from_pos, sym, tf, 0, 500)
+                rates = fut.result(timeout=30)
+            if rates is None or len(rates) == 0:
+                logging.warning("No %s data for %s", label, sym)
+                return None
+            df = pd.DataFrame(rates)
+            df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
+            dt = pd.to_datetime(df["time"], unit="s")
+            df["DATETIME"] = dt
+            return df
+        except concurrent.futures.TimeoutError:
+            logging.warning("MT5 %s TIMEOUT for %s", label, sym)
+            return None
+        except Exception as e:
+            logging.warning("MT5 %s error: %s", label, e)
+            return None
+
     def _prepare_live_data(self, symbol="XAUUSD"):
-        """MT5-аас сүүлийн 500 мөр татаж, features бэлтгэнэ. Timeout-той."""
+        """M15, H1, H4 - гурван timeframe-аас data татаж features бэлтгэнэ."""
         if not self.executor.connected:
             logging.warning("MT5 not connected, using cached data")
             return self._cached_data
         sym = self.executor._resolve_symbol(symbol)
-        rates = None
-        try:
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
-                fut = ex.submit(self.executor.mt5.copy_rates_from_pos, sym, self.executor.mt5.TIMEFRAME_H1, 0, 500)
-                rates = fut.result(timeout=30)
-        except concurrent.futures.TimeoutError:
-            logging.error("MT5 copy_rates_from_pos TIMEOUT after 30s, using cached data")
+        d15 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_M15, "M15")
+        h1 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H1, "H1")
+        h4 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H4, "H4")
+        main_df = d15 if d15 is not None else (h1 if h1 is not None else h4)
+        if main_df is None:
+            logging.warning("No data from any timeframe, using cached data")
             return self._cached_data
-        except Exception as e:
-            logging.error("MT5 copy_rates_from_pos failed: %s, using cached data", e)
-            return self._cached_data
-        if rates is None or len(rates) == 0:
-            logging.warning("MT5 no data for %s (err: %s), using cached data",
-                            sym, self.executor.mt5.last_error())
-            return self._cached_data
-        df = pd.DataFrame(rates)
-        dt = pd.to_datetime(df["time"], unit="s")
+        df = main_df.copy()
+        dt = df["DATETIME"]
         df["DATE"] = dt.dt.strftime("%Y.%m.%d")
         df["TIME"] = dt.dt.strftime("%H:%M:%S")
-        df.rename(columns={"open": "OPEN", "high": "HIGH", "low": "LOW", "close": "CLOSE", "tick_volume": "VOLUME"}, inplace=True)
+        if h1 is not None:
+            df["H1_OPEN"] = h1["OPEN"].reindex_like(df, method="ffill")
+            df["H1_CLOSE"] = h1["CLOSE"].reindex_like(df, method="ffill")
+            df["H1_HIGH"] = h1["HIGH"].reindex_like(df, method="ffill")
+            df["H1_LOW"] = h1["LOW"].reindex_like(df, method="ffill")
+        if h4 is not None:
+            df["H4_OPEN"] = h4["OPEN"].reindex_like(df, method="ffill")
+            df["H4_CLOSE"] = h4["CLOSE"].reindex_like(df, method="ffill")
+            df["H4_HIGH"] = h4["HIGH"].reindex_like(df, method="ffill")
+            df["H4_LOW"] = h4["LOW"].reindex_like(df, method="ffill")
         tick = self.executor.mt5.symbol_info_tick(sym)
         last_spread = (tick.ask - tick.bid) / tick.bid * 10000 if tick and tick.bid > 0 else 1.0
         df["SPREAD"] = last_spread
-        logging.info("Live data: %d rows from %s", len(df), sym)
+        logging.info("Live data: %d M15 rows + H1/H4 from %s", len(df), sym)
         result = self._prepare_data(df)
+        self._cached_mtf = (d15, h1, h4, result)
         self._cached_data = result
         return result
 
@@ -365,8 +390,26 @@ class TournamentBot:
 
         logging.info("[STATUS] Bot main loop started. Fetching MT5 data...")
 
+        def _wait_for_next_m15():
+            """Дараагийн M15 лаа гарах хүртэл хүлээнэ."""
+            now = datetime.now()
+            # M15 лаа: 00, 15, 30, 45 минут
+            minute = now.minute
+            next_min = ((minute // 15) + 1) * 15
+            if next_min >= 60:
+                next_dt = now.replace(minute=0, second=0, microsecond=0) + timedelta(hours=1)
+            else:
+                next_dt = now.replace(minute=next_min, second=0, microsecond=0)
+            sleep_sec = (next_dt - now).total_seconds()
+            if sleep_sec > 0:
+                logging.info("[WAIT] Next M15 candle at %s (%ds)", next_dt.strftime("%H:%M"), int(sleep_sec))
+                time.sleep(sleep_sec)
+
+        self._cached_mtf = None
+
         while True:
             try:
+                _wait_for_next_m15()
                 now = datetime.now()
                 logging.info("[CYCLE] start")
 
@@ -473,8 +516,6 @@ class TournamentBot:
                                      lot, prob, balance, sl_points)
 
                 logging.info("[CYCLE] end prob=%.3f signal=%s", prob, sig["signal"])
-                time.sleep(self.scan_interval)
-                logging.info("[CYCLE] wake")
 
             except (ConnectionError, TimeoutError, ValueError, OSError) as e:
                 logging.error("[BEAT] Recoverable error: %s - retrying in 30s", e)
