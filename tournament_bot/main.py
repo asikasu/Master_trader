@@ -335,34 +335,39 @@ class TournamentBot:
             # train & evaluate each bot
             gen_results = []
             for idx, combo in enumerate(pop):
-                est = min(combo.xgb.n_estimators, 100)
-                model = XGBClassifier(
-                    n_estimators=est,
-                    max_depth=combo.xgb.max_depth,
-                    learning_rate=combo.xgb.learning_rate,
-                    subsample=combo.xgb.subsample,
-                    colsample_bytree=combo.xgb.colsample_bytree,
-                    min_child_weight=combo.xgb.min_child_weight,
-                    gamma=combo.xgb.gamma,
-                    scale_pos_weight=combo.xgb.scale_pos_weight,
-                    random_state=42, n_jobs=-1,
-                )
-                model.fit(X_train, y_train, verbose=False)
-                probs = model.predict_proba(X_test)[:, 1]
+                try:
+                    est = min(combo.xgb.n_estimators, 100)
+                    model = XGBClassifier(
+                        n_estimators=est,
+                        max_depth=combo.xgb.max_depth,
+                        learning_rate=combo.xgb.learning_rate,
+                        subsample=combo.xgb.subsample,
+                        colsample_bytree=combo.xgb.colsample_bytree,
+                        min_child_weight=combo.xgb.min_child_weight,
+                        gamma=combo.xgb.gamma,
+                        scale_pos_weight=combo.xgb.scale_pos_weight,
+                        random_state=42, n_jobs=-1,
+                    )
+                    model.fit(X_train, y_train, verbose=False)
+                    probs = model.predict_proba(X_test)[:, 1]
 
-                # eval: F1 at thr=0.50
-                pred = (probs > 0.50).astype(int)
-                f1 = f1_score(y_test, pred, zero_division=0)
-                acc = accuracy_score(y_test, pred)
+                    pred = (probs > 0.50).astype(int)
+                    f1 = f1_score(y_test, pred, zero_division=0)
+                    acc = accuracy_score(y_test, pred)
 
-                wins = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==1)
-                losses = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==0)
-                trades = wins + losses
-                wr = wins/trades if trades>0 else 0
+                    wins = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==1)
+                    losses = sum(1 for i in range(len(pred)) if pred[i]==1 and y_test.iloc[i]==0)
+                    trades = wins + losses
+                    wr = wins/trades if trades>0 else 0
 
-                score = f1 * 0.5 + wr * 0.3 + (acc-0.5) * 0.2
-                gen_results.append((combo, score, f1, wr, trades))
-                print(f"  Bot #{combo.combo_id:>3}: F1={f1:.4f}  WR={wr:.2%}  trades={trades}  score={score:.4f}")
+                    score = f1 * 0.5 + wr * 0.3 + (acc-0.5) * 0.2
+                    gen_results.append((combo, score, f1, wr, trades))
+                    print(f"  Bot #{combo.combo_id:>3}: F1={f1:.4f}  WR={wr:.2%}  trades={trades}  score={score:.4f}")
+                except Exception as e:
+                    import traceback
+                    print(f"  Bot #{combo.combo_id} FAILED: {e}")
+                    traceback.print_exc()
+                    gen_results.append((combo, 0, 0, 0, 0))
 
             # rank & keep top 2
             gen_results.sort(key=lambda x: x[1], reverse=True)
