@@ -728,7 +728,16 @@ if __name__ == "__main__":
         if args.mode in ("TRAIN", "BOTH"):
             bot.run_train(n_rows=args.sample)
         if args.mode in ("EVOLVE", "BOTH"):
-            bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample, year_filter=(2016, 2023))
+            while True:
+                try:
+                    bot.run_evolve(generations=args.generations, population=args.population, sample_size=args.sample, year_filter=(2016, 2023))
+                    break
+                except Exception as e:
+                    import traceback
+                    print(f"!!! EVOLVE CRASHED: {e}")
+                    traceback.print_exc()
+                    print("Restarting evolution in 10s...")
+                    time.sleep(10)
         if args.mode == "LIVE":
             while True:
                 try:
