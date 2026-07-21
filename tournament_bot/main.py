@@ -141,36 +141,41 @@ class TournamentBot:
         if not self.executor.connected:
             logging.warning("MT5 not connected, using cached data")
             return self._cached_data
-        sym = self.executor._resolve_symbol(symbol)
-        d15 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_M15, "M15")
-        h1 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H1, "H1")
-        h4 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H4, "H4")
-        main_df = d15 if d15 is not None else (h1 if h1 is not None else h4)
-        if main_df is None:
-            logging.warning("No data from any timeframe, using cached data")
-            return self._cached_data
-        df = main_df.copy()
-        dt = df["DATETIME"]
-        df["DATE"] = dt.dt.strftime("%Y.%m.%d")
-        df["TIME"] = dt.dt.strftime("%H:%M:%S")
-        if h1 is not None:
-            df["H1_OPEN"] = h1["OPEN"].reindex_like(df, method="ffill")
-            df["H1_CLOSE"] = h1["CLOSE"].reindex_like(df, method="ffill")
-            df["H1_HIGH"] = h1["HIGH"].reindex_like(df, method="ffill")
-            df["H1_LOW"] = h1["LOW"].reindex_like(df, method="ffill")
-        if h4 is not None:
-            df["H4_OPEN"] = h4["OPEN"].reindex_like(df, method="ffill")
-            df["H4_CLOSE"] = h4["CLOSE"].reindex_like(df, method="ffill")
-            df["H4_HIGH"] = h4["HIGH"].reindex_like(df, method="ffill")
-            df["H4_LOW"] = h4["LOW"].reindex_like(df, method="ffill")
-        tick = self.executor.mt5.symbol_info_tick(sym)
-        last_spread = (tick.ask - tick.bid) / tick.bid * 10000 if tick and tick.bid > 0 else 1.0
-        df["SPREAD"] = last_spread
-        logging.info("Live data: %d M15 rows + H1/H4 from %s", len(df), sym)
-        result = self._prepare_data(df)
-        self._cached_mtf = (d15, h1, h4, result)
-        self._cached_data = result
-        return result
+        try:
+            sym = self.executor._resolve_symbol(symbol)
+            d15 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_M15, "M15")
+            h1 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H1, "H1")
+            h4 = self._fetch_mtf_rates(sym, self.executor.mt5.TIMEFRAME_H4, "H4")
+            main_df = d15 if d15 is not None else (h1 if h1 is not None else h4)
+            if main_df is None:
+                logging.warning("No data from any timeframe")
+                return None
+            df = main_df.copy()
+            dt = df["DATETIME"]
+            df["DATE"] = dt.dt.strftime("%Y.%m.%d")
+            df["TIME"] = dt.dt.strftime("%H:%M:%S")
+            if h1 is not None:
+                df["H1_OPEN"] = h1["OPEN"].reindex_like(df, method="ffill")
+                df["H1_CLOSE"] = h1["CLOSE"].reindex_like(df, method="ffill")
+                df["H1_HIGH"] = h1["HIGH"].reindex_like(df, method="ffill")
+                df["H1_LOW"] = h1["LOW"].reindex_like(df, method="ffill")
+            if h4 is not None:
+                df["H4_OPEN"] = h4["OPEN"].reindex_like(df, method="ffill")
+                df["H4_CLOSE"] = h4["CLOSE"].reindex_like(df, method="ffill")
+                df["H4_HIGH"] = h4["HIGH"].reindex_like(df, method="ffill")
+                df["H4_LOW"] = h4["LOW"].reindex_like(df, method="ffill")
+            tick = self.executor.mt5.symbol_info_tick(sym)
+            last_spread = (tick.ask - tick.bid) / tick.bid * 10000 if tick and tick.bid > 0 else 1.0
+            df["SPREAD"] = last_spread
+            logging.info("Live data: %d rows from %s", len(df), sym)
+            logging.debug("MT5 raw last 3: %s", df[["DATE","TIME","OPEN","HIGH","LOW","CLOSE","VOLUME"]].tail(3).to_string())
+            result = self._prepare_data(df)
+            if result is not None and len(result) > 0:
+                self._cached_data = result
+            return result
+        except Exception as e:
+            logging.error("_prepare_live_data failed: %s", e, exc_info=True)
+            return None
 
     def _prepare_data(self, df=None, n_rows=500):
         if df is None:
@@ -181,6 +186,11 @@ class TournamentBot:
         df["Target"] = (future_move > df["ATR14"] * 0.3).astype(int)
         df = df.iloc[:-4].dropna(subset=["Target", "CLOSE"]).copy()
         logging.info("Data: raw=%d, features=%d, trainable=%d", raw_count, raw_count, len(df))
+        if len(df) > 0:
+            logging.debug("Last row features: EMA20=%.2f EMA50=%.2f ATR14=%.4f SPREAD=%.2f CLOSE=%.2f",
+                          df["EMA20"].iloc[-1], df["EMA50"].iloc[-1], df["ATR14"].iloc[-1],
+                          df["SPREAD"].iloc[-1] if "SPREAD" in df.columns else 0,
+                          df["CLOSE"].iloc[-1])
         return df
 
     def run_train(self, n_rows=500):
@@ -481,13 +491,14 @@ class TournamentBot:
                 sig["signal"] = mtf_result["signal"]
                 sig["reason"] = mtf_result["reason"]
 
+                safe_row = last_row.fillna(0) if hasattr(last_row, 'fillna') else last_row
                 self.dashboard.update(
                     last_signal=sig["signal"],
-                    last_prob=mtf_result["confidence"],
-                    spread_bps=last_row.get("SPREAD", 0),
-                    ema20=last_row.get("EMA20", 0),
-                    ema50=last_row.get("EMA50", 0),
-                    atr=current_atr,
+                    last_prob=mtf_result["confidence"] if mtf_result["confidence"] > 0 else prob,
+                    spread_bps=safe_row.get("SPREAD", 0),
+                    ema20=safe_row.get("EMA20", 0),
+                    ema50=safe_row.get("EMA50", 0),
+                    atr=current_atr if current_atr > 0 else safe_row.get("ATR14", 0),
                 )
 
                 if sig["signal"] in ("BUY", "SELL"):
