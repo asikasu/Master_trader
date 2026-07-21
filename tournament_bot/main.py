@@ -341,7 +341,6 @@ class TournamentBot:
             mode="LIVE",
             mt5_status="connected" if mt5_ok else "simulation",
         )
-        self._running = True
 
         def handle_stop(sig, frame):
             self._save_state(balance)
@@ -356,6 +355,8 @@ class TournamentBot:
         signal_count = 0
         entry_sl = None
         entry_tp = None
+
+        logging.info("[STATUS] Bot main loop started. Fetching MT5 data...")
 
         while True:
             try:
@@ -462,10 +463,12 @@ class TournamentBot:
                         logging.info("Lot too small: %.3f (prob=%.3f, balance=%.2f, sl_pts=%.1f)",
                                      lot, prob, balance, sl_points)
 
+                logging.info("[BEAT] prob=%.3f signal=%s spread=%.1f next_check=%ds",
+                             prob, sig["signal"], last_row.get("SPREAD",0), self.scan_interval)
                 time.sleep(self.scan_interval)
 
             except (ConnectionError, TimeoutError, ValueError, OSError) as e:
-                logging.error("LIVE recoverable error: %s", e)
+                logging.error("[BEAT] Recoverable error: %s - retrying in 30s", e)
                 self._save_state(balance)
                 time.sleep(30)
             except Exception as e:
